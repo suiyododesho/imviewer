@@ -16,3 +16,4 @@ site/otherfile/*
 site/thumbnail/*
 site/banner/*
 releases/*
+site/structure.json

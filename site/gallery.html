@@ -196,6 +196,42 @@
       min-height: 0;
     }
 
+    .media-stage-content.is-spread {
+      flex-direction: row;
+      align-items: stretch;
+      justify-content: center;
+      gap: 10px;
+    }
+
+    .media-stage-pane {
+      flex: 1;
+      min-width: 0;
+      min-height: 0;
+      border: 1px solid #2b2b2b;
+      border-radius: 4px;
+      background: #101010;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+      padding: 6px;
+    }
+
+    .media-stage-pane.is-empty {
+      background: #0d0d0d;
+      border-color: #1d1d1d;
+    }
+
+    .media-stage-pane img,
+    .media-stage-pane video {
+      max-width: 100%;
+      max-height: 100%;
+      width: auto;
+      height: auto;
+      object-fit: contain;
+      display: block;
+    }
+
     .media-stage-image {
       transform-origin: center center;
       transition: transform 120ms ease-out;
@@ -598,6 +634,21 @@
         flex-wrap: wrap;
       }
 
+      .spread-mode-control {
+        width: 100%;
+      }
+
+      .spread-mode-button {
+        width: 100%;
+        min-width: 0;
+      }
+
+      .spread-mode-menu {
+        left: 0;
+        right: auto;
+        width: 100%;
+      }
+
       .gallery-footer-nav .nav-buttons .nav-button {
         flex: 1 1 calc(50% - 6px);
       }
@@ -673,6 +724,89 @@
     .gallery-footer-nav .nav-buttons {
       display: flex;
       gap: 12px;
+    }
+
+    .spread-mode-control {
+      position: relative;
+      flex-shrink: 0;
+    }
+
+    .spread-mode-button {
+      min-width: 190px;
+      height: 40px;
+      padding: 0 12px;
+      border: 1px solid #d6dbe3;
+      border-radius: 8px;
+      background: #fff;
+      color: #1f2a37;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      text-align: left;
+      display: inline-flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+    }
+
+    .spread-mode-button::after {
+      content: '▾';
+      font-size: 12px;
+      color: #4c5e75;
+    }
+
+    .spread-mode-button:hover {
+      border-color: #aac5e4;
+      background: #f5faff;
+    }
+
+    .spread-mode-button:focus-visible {
+      outline: 2px solid #7fb7ef;
+      outline-offset: 1px;
+    }
+
+    .spread-mode-menu {
+      position: absolute;
+      right: 0;
+      bottom: calc(100% + 8px);
+      width: min(260px, 72vw);
+      border: 1px solid #d2dae5;
+      border-radius: 10px;
+      background: #fff;
+      box-shadow: 0 8px 24px rgba(12, 30, 53, 0.18);
+      padding: 6px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      z-index: 30;
+    }
+
+    .spread-mode-menu[hidden] {
+      display: none;
+    }
+
+    .spread-mode-menu-item {
+      width: 100%;
+      border: 1px solid transparent;
+      border-radius: 8px;
+      background: transparent;
+      color: #243447;
+      text-align: left;
+      padding: 8px 10px;
+      font-size: 13px;
+      cursor: pointer;
+    }
+
+    .spread-mode-menu-item:hover {
+      background: #eff6ff;
+      border-color: #c7dcf7;
+    }
+
+    .spread-mode-menu-item.is-active {
+      background: #0f4c81;
+      color: #fff;
+      border-color: #0f4c81;
+      font-weight: 700;
     }
 
     .keyboard-help {
@@ -832,6 +966,10 @@
           <button id="prevButton" class="nav-button">← 前へ</button>
           <button id="nextButton" class="nav-button">次へ →</button>
           <button id="fullscreenToggle" class="nav-button" aria-pressed="false">全画面</button>
+        </div>
+        <div class="spread-mode-control">
+          <button id="spreadModeButton" class="spread-mode-button" type="button" aria-haspopup="menu" aria-expanded="false" aria-controls="spreadModeMenu">単一ページ表示</button>
+          <div id="spreadModeMenu" class="spread-mode-menu" role="menu" hidden></div>
         </div>
         <a id="openOriginalLink" class="external-link" href="#" target="_blank" rel="noopener noreferrer">元のHTMLを別タブで開く</a>
         <div id="galleryPageNav" class="gallery-page-nav"></div>

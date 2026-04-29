@@ -69,6 +69,24 @@
     assert('動画 entry は type=video', videoEntry.type, 'video');
     assert('動画 path は contents/ 配下に正規化', videoEntry.video, 'contents/photo/sample/person/movie%2001.MKV');
     assert('動画連番が保持される', videoEntry.thumbNumber, 2);
+
+    log('\n--- spread mode helpers ---');
+    assert('不正な表示モードは single に正規化', utils.normalizeGalleryViewMode('invalid-mode'), 'single');
+    assert('表示モードラベル解決', utils.getGalleryViewModeLabel('rtl-cover'), '右綴じ(表紙あり)');
+
+    const rtlCover = utils.buildSpreadUnits(5, 'rtl-cover').map((unit) => unit.slots);
+    assert('右綴じ(表紙あり) 見開き割り当て', rtlCover, [
+      [null, 0],
+      [2, 1],
+      [4, 3],
+    ]);
+
+    const ltrNoCover = utils.buildSpreadUnits(5, 'ltr-nocover').map((unit) => unit.slots);
+    assert('左綴じ(表紙なし) 見開き割り当て', ltrNoCover, [
+      [0, 1],
+      [2, 3],
+      [4, null],
+    ]);
   }
 
   log(`\n=== Gallery unit test result ===`);

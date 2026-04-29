@@ -88,6 +88,22 @@ const swipeNavState = {
 };
 
 const STAGE_THUMBNAIL_SIZE = 176;
+const GALLERY_VIEW_MODE_STORAGE_KEY = 'imviewer.gallery.viewMode';
+
+const GALLERY_VIEW_MODES = [
+  { key: 'single', label: '単一ページ表示' },
+  { key: 'rtl-cover', label: '右綴じ(表紙あり)' },
+  { key: 'ltr-cover', label: '左綴じ(表紙あり)' },
+  { key: 'rtl-nocover', label: '右綴じ(表紙なし)' },
+  { key: 'ltr-nocover', label: '左綴じ(表紙なし)' },
+];
+
+const galleryDisplayState = {
+  mode: 'single',
+  modeButton: null,
+  modeMenu: null,
+  menuOpen: false,
+};
 
 // ============ Initialization ============
 
@@ -127,11 +143,13 @@ document.addEventListener('DOMContentLoaded', () => {
     currentGalleryIndex = 0;
     currentGallery = currentGalleries[currentGalleryIndex];
     galleryPages = buildGalleryPages(currentGallery.path, currentGallery);
+    galleryDisplayState.mode = loadGalleryViewMode();
     resetBackgroundThumbnailWarmup();
 
     updateBreadcrumbs();
     renderThumbnailStrip();
     setupNavigation();
+    setupDisplayModeControl();
     setupSearch();
     setupZoomInteractions();
     setupThumbnailMode();
@@ -266,6 +284,110 @@ function getVideoSequenceNumber(index) {
     }
   }
   return count || 1;
+}
+
+function normalizeGalleryViewMode(mode) {
+  const key = String(mode || '').trim();
+  const exists = GALLERY_VIEW_MODES.some((item) => item.key === key);
+  return exists ? key : 'single';
+}
+
+function getGalleryViewModeLabel(mode) {
+  const normalized = normalizeGalleryViewMode(mode);
+  const found = GALLERY_VIEW_MODES.find((item) => item.key === normalized);
+  return found ? found.label : '単一ページ表示';
+}
+
+function isSpreadViewMode(mode) {
+  return normalizeGalleryViewMode(mode) !== 'single';
+}
+
+function buildSpreadUnits(totalPages, mode) {
+  const total = Number(totalPages) || 0;
+  if (total <= 0) {
+    return [];
+  }
+
+  const normalized = normalizeGalleryViewMode(mode);
+  if (normalized === 'single') {
+    return Array.from({ length: total }, (_, index) => ({
+      left: index,
+      right: null,
+      slots: [index],
+      members: [index],
+    }));
+  }
+
+  const units = [];
+  const isRtl = normalized.startsWith('rtl');
+  const hasCover = normalized.endsWith('-cover');
+
+  if (hasCover) {
+    if (isRtl) {
+      units.push({ left: null, right: 0 });
+    } else {
+      units.push({ left: 0, right: null });
+    }
+  }
+
+  let cursor = hasCover ? 1 : 0;
+  while (cursor < total) {
+    if (isRtl) {
+      const right = cursor;
+      const left = (cursor + 1) < total ? cursor + 1 : null;
+      units.push({ left, right });
+    } else {
+      const left = cursor;
+      const right = (cursor + 1) < total ? cursor + 1 : null;
+      units.push({ left, right });
+    }
+    cursor += 2;
+  }
+
+  return units.map((unit) => ({
+    left: Number.isInteger(unit.left) ? unit.left : null,
+    right: Number.isInteger(unit.right) ? unit.right : null,
+    slots: [unit.left, unit.right],
+    members: [unit.left, unit.right].filter((value) => Number.isInteger(value)),
+  }));
+}
+
+function getPreferredFocusIndexForSpread(unit, mode) {
+  if (!unit || !Array.isArray(unit.members) || unit.members.length === 0) {
+    return 0;
+  }
+
+  const normalized = normalizeGalleryViewMode(mode);
+  if (normalized.startsWith('rtl')) {
+    return Number.isInteger(unit.right) ? unit.right : unit.members[0];
+  }
+  return Number.isInteger(unit.left) ? unit.left : unit.members[0];
+}
+
+function getCurrentSpreadInfo() {
+  const units = buildSpreadUnits(galleryPages.length, galleryDisplayState.mode);
+  if (units.length === 0) {
+    return { units: [], unitIndex: -1, unit: null };
+  }
+
+  let unitIndex = units.findIndex((candidate) => candidate.members.includes(currentPageIndex));
+  if (unitIndex < 0) {
+    unitIndex = 0;
+  }
+
+  return {
+    units,
+    unitIndex,
+    unit: units[unitIndex],
+  };
+}
+
+function getActivePageIndexes() {
+  const spread = getCurrentSpreadInfo();
+  if (!spread.unit) {
+    return [];
+  }
+  return spread.unit.members.slice();
 }
 
 function primeThumbnailCache() {
@@ -536,32 +658,69 @@ function renderCurrentPage() {
   if (currentPageIndex < 0) currentPageIndex = 0;
   if (currentPageIndex >= galleryPages.length) currentPageIndex = galleryPages.length - 1;
 
-  const page = galleryPages[currentPageIndex];
-  resetZoomState();
-  renderStageContent(stage, page);
+  const spreadInfo = getCurrentSpreadInfo();
+  if (!spreadInfo.unit) {
+    showError('表示できる画像・動画が見つかりません');
+    return;
+  }
 
-  if (isVideoEntry(page)) {
-    openOriginalLink.href = page.video || page.html || '#';
+  if (!spreadInfo.unit.members.includes(currentPageIndex)) {
+    currentPageIndex = getPreferredFocusIndexForSpread(spreadInfo.unit, galleryDisplayState.mode);
+  }
+
+  const focusedPage = galleryPages[currentPageIndex];
+  resetZoomState();
+  renderStageContent(stage, spreadInfo);
+
+  if (focusedPage && isVideoEntry(focusedPage)) {
+    openOriginalLink.href = focusedPage.video || focusedPage.html || '#';
     openOriginalLink.textContent = '動画ファイルを別タブで開く';
   } else {
-    openOriginalLink.href = page.html || '#';
+    openOriginalLink.href = (focusedPage && focusedPage.html) || '#';
     openOriginalLink.textContent = '元のHTMLを別タブで開く';
   }
   openOriginalLink.target = '_blank';
   openOriginalLink.rel = 'noopener noreferrer';
 
-  navInfo.textContent = `${currentPageIndex + 1} / ${galleryPages.length} (${isVideoEntry(page) ? '動画' : '画像'})`;
+  const modeLabel = getGalleryViewModeLabel(galleryDisplayState.mode);
+  if (isSpreadViewMode(galleryDisplayState.mode)) {
+    const pageText = spreadInfo.unit.members.map((index) => String(index + 1)).join(' / ');
+    navInfo.textContent = `${pageText} / ${galleryPages.length} (${modeLabel})`;
+  } else {
+    navInfo.textContent = `${currentPageIndex + 1} / ${galleryPages.length} (${focusedPage && isVideoEntry(focusedPage) ? '動画' : '画像'})`;
+  }
+
   updateNavigationButtons();
   updateActiveThumbnail();
   updateActiveStageThumbnail();
 }
 
-function renderStageContent(stage, page) {
+function renderStageContent(stage, spreadInfo) {
   const existing = stage.querySelector('.media-stage-root');
   if (existing) {
     existing.remove();
   }
 
+  if (!spreadInfo || !spreadInfo.unit) return;
+
+  if (!isSpreadViewMode(galleryDisplayState.mode)) {
+    const page = galleryPages[currentPageIndex];
+    renderSingleStageContent(stage, page);
+    return;
+  }
+
+  const wrapper = document.createElement('div');
+  wrapper.className = 'media-stage-content media-stage-root is-spread';
+
+  spreadInfo.unit.slots.forEach((pageIndex) => {
+    wrapper.appendChild(createSpreadPane(pageIndex));
+  });
+
+  stage.prepend(wrapper);
+  setZoomMedia(null);
+}
+
+function renderSingleStageContent(stage, page) {
   if (!page) return;
 
   if (isVideoEntry(page)) {
@@ -634,6 +793,46 @@ function renderStageContent(stage, page) {
   wrapper.appendChild(img);
   stage.prepend(wrapper);
   setZoomMedia(img);
+}
+
+function createSpreadPane(pageIndex) {
+  const pane = document.createElement('div');
+  pane.className = 'media-stage-pane';
+
+  if (!Number.isInteger(pageIndex) || !galleryPages[pageIndex]) {
+    pane.classList.add('is-empty');
+    pane.setAttribute('aria-hidden', 'true');
+    return pane;
+  }
+
+  const page = galleryPages[pageIndex];
+
+  if (isVideoEntry(page)) {
+    const video = document.createElement('video');
+    video.className = 'media-stage-video';
+    video.controls = true;
+    video.preload = 'metadata';
+    video.autoplay = true;
+    video.playsInline = true;
+
+    const source = document.createElement('source');
+    source.src = page.video;
+    const mime = inferVideoMimeType(page.video);
+    if (mime) {
+      source.type = mime;
+    }
+    video.appendChild(source);
+    pane.appendChild(video);
+    video.load();
+    return pane;
+  }
+
+  const img = document.createElement('img');
+  img.className = 'media-stage-spread-image';
+  img.src = page.image;
+  img.alt = `${currentGallery ? (currentGallery.name || currentGallery.path || '') : ''} ${pageIndex + 1}`;
+  pane.appendChild(img);
+  return pane;
 }
 
 function renderThumbnailStrip() {
@@ -711,14 +910,17 @@ function updateActiveThumbnail() {
   const strip = document.getElementById('thumbList');
   if (!strip) return;
 
+  const activeIndexes = new Set(getActivePageIndexes());
   const buttons = strip.querySelectorAll('.thumb-item');
-  buttons.forEach((btn) => btn.classList.remove('is-active'));
+  buttons.forEach((btn) => {
+    const index = Number.parseInt(btn.getAttribute('data-index') || '-1', 10);
+    btn.classList.toggle('is-active', activeIndexes.has(index));
+  });
 
-  const active = strip.querySelector(`.thumb-item[data-index="${currentPageIndex}"]`);
-  if (!active) return;
-
-  active.classList.add('is-active');
-  active.scrollIntoView({ block: 'nearest' });
+  const focusIndex = currentPageIndex;
+  const focusButton = strip.querySelector(`.thumb-item[data-index="${focusIndex}"]`);
+  if (!focusButton) return;
+  focusButton.scrollIntoView({ block: 'nearest' });
 }
 
 function setupThumbnailMode() {
@@ -940,6 +1142,13 @@ function updateActiveStageThumbnail() {
 
   renderVirtualThumbnailWindow(false);
 
+  const activeIndexes = new Set(getActivePageIndexes());
+  const visibleButtons = panel.querySelectorAll('.stage-thumb-item');
+  visibleButtons.forEach((button) => {
+    const index = Number.parseInt(button.getAttribute('data-index') || '-1', 10);
+    button.classList.toggle('is-active', activeIndexes.has(index));
+  });
+
   const active = panel.querySelector(`.stage-thumb-item[data-index="${currentPageIndex}"]`);
   if (!active) {
     if (thumbnailModeState.enabled && !thumbnailModeState.suppressAutoScrollOnce) {
@@ -947,18 +1156,10 @@ function updateActiveStageThumbnail() {
       renderVirtualThumbnailWindow(true);
     }
 
-    if (thumbnailModeState.activeThumbButton) {
-      thumbnailModeState.activeThumbButton.classList.remove('is-active');
-      thumbnailModeState.activeThumbButton = null;
-    }
+    thumbnailModeState.activeThumbButton = null;
     return;
   }
 
-  if (thumbnailModeState.activeThumbButton && thumbnailModeState.activeThumbButton !== active) {
-    thumbnailModeState.activeThumbButton.classList.remove('is-active');
-  }
-
-  active.classList.add('is-active');
   thumbnailModeState.activeThumbButton = active;
   if (thumbnailModeState.enabled) {
     if (thumbnailModeState.suppressAutoScrollOnce) {
@@ -1612,6 +1813,140 @@ function setZoomControlEnabled(enabled) {
   }
 }
 
+// ============ Display Mode ============
+
+function setupDisplayModeControl() {
+  galleryDisplayState.modeButton = document.getElementById('spreadModeButton');
+  galleryDisplayState.modeMenu = document.getElementById('spreadModeMenu');
+
+  if (!galleryDisplayState.modeButton || !galleryDisplayState.modeMenu) {
+    return;
+  }
+
+  renderDisplayModeMenu();
+  updateDisplayModeButton();
+
+  galleryDisplayState.modeButton.addEventListener('click', (event) => {
+    event.stopPropagation();
+    toggleDisplayModeMenu();
+  });
+
+  galleryDisplayState.modeMenu.addEventListener('click', (event) => {
+    event.stopPropagation();
+  });
+
+  document.addEventListener('click', (event) => {
+    if (!galleryDisplayState.menuOpen) {
+      return;
+    }
+
+    const control = galleryDisplayState.modeButton ? galleryDisplayState.modeButton.closest('.spread-mode-control') : null;
+    if (control && control.contains(event.target)) {
+      return;
+    }
+    closeDisplayModeMenu();
+  });
+}
+
+function renderDisplayModeMenu() {
+  const menu = galleryDisplayState.modeMenu;
+  if (!menu) {
+    return;
+  }
+
+  menu.innerHTML = '';
+  GALLERY_VIEW_MODES.forEach((item) => {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'spread-mode-menu-item';
+    button.textContent = item.label;
+    button.setAttribute('role', 'menuitemradio');
+    button.setAttribute('aria-checked', item.key === galleryDisplayState.mode ? 'true' : 'false');
+    if (item.key === galleryDisplayState.mode) {
+      button.classList.add('is-active');
+    }
+
+    button.addEventListener('click', () => {
+      applyGalleryViewMode(item.key, true);
+      closeDisplayModeMenu();
+    });
+
+    menu.appendChild(button);
+  });
+}
+
+function updateDisplayModeButton() {
+  if (!galleryDisplayState.modeButton) {
+    return;
+  }
+
+  galleryDisplayState.modeButton.textContent = getGalleryViewModeLabel(galleryDisplayState.mode);
+}
+
+function openDisplayModeMenu() {
+  if (!galleryDisplayState.modeMenu || !galleryDisplayState.modeButton) {
+    return;
+  }
+
+  galleryDisplayState.menuOpen = true;
+  galleryDisplayState.modeMenu.hidden = false;
+  galleryDisplayState.modeButton.setAttribute('aria-expanded', 'true');
+}
+
+function closeDisplayModeMenu() {
+  if (!galleryDisplayState.modeMenu || !galleryDisplayState.modeButton) {
+    return;
+  }
+
+  galleryDisplayState.menuOpen = false;
+  galleryDisplayState.modeMenu.hidden = true;
+  galleryDisplayState.modeButton.setAttribute('aria-expanded', 'false');
+}
+
+function toggleDisplayModeMenu() {
+  if (galleryDisplayState.menuOpen) {
+    closeDisplayModeMenu();
+  } else {
+    openDisplayModeMenu();
+  }
+}
+
+function applyGalleryViewMode(mode, persist) {
+  const normalized = normalizeGalleryViewMode(mode);
+  if (normalized === galleryDisplayState.mode) {
+    renderDisplayModeMenu();
+    updateDisplayModeButton();
+    return;
+  }
+
+  galleryDisplayState.mode = normalized;
+  renderDisplayModeMenu();
+  updateDisplayModeButton();
+
+  if (persist) {
+    persistGalleryViewMode(galleryDisplayState.mode);
+  }
+
+  renderCurrentPage();
+}
+
+function loadGalleryViewMode() {
+  try {
+    return normalizeGalleryViewMode(window.localStorage.getItem(GALLERY_VIEW_MODE_STORAGE_KEY));
+  } catch (error) {
+    console.debug('Failed to load gallery view mode:', error);
+    return 'single';
+  }
+}
+
+function persistGalleryViewMode(mode) {
+  try {
+    window.localStorage.setItem(GALLERY_VIEW_MODE_STORAGE_KEY, normalizeGalleryViewMode(mode));
+  } catch (error) {
+    console.debug('Failed to persist gallery view mode:', error);
+  }
+}
+
 // ============ Navigation ============
 
 function setupNavigation() {
@@ -1631,6 +1966,11 @@ function setupNavigation() {
   }
 
   document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && galleryDisplayState.menuOpen) {
+      closeDisplayModeMenu();
+      return;
+    }
+
     if (e.key === 'Escape' && thumbnailModeState.enabled) {
       setThumbnailMode(false);
       return;
@@ -1659,19 +1999,41 @@ function canUseGalleryFullscreen() {
 }
 
 function navigatePrevPage() {
-  if (currentPageIndex > 0) {
+  const spread = getCurrentSpreadInfo();
+  if (isSpreadViewMode(galleryDisplayState.mode) && spread.unitIndex >= 0) {
+    if (spread.unitIndex > 0) {
+      const prevUnit = spread.units[spread.unitIndex - 1];
+      currentPageIndex = getPreferredFocusIndexForSpread(prevUnit, galleryDisplayState.mode);
+      renderCurrentPage();
+      return;
+    }
+  } else if (currentPageIndex > 0) {
     currentPageIndex -= 1;
     renderCurrentPage();
-  } else if (currentGalleryIndex > 0) {
+    return;
+  }
+
+  if (currentGalleryIndex > 0) {
     loadGalleryByIndex(currentGalleryIndex - 1, 'last');
   }
 }
 
 function navigateNextPage() {
-  if (currentPageIndex < galleryPages.length - 1) {
+  const spread = getCurrentSpreadInfo();
+  if (isSpreadViewMode(galleryDisplayState.mode) && spread.unitIndex >= 0) {
+    if (spread.unitIndex < spread.units.length - 1) {
+      const nextUnit = spread.units[spread.unitIndex + 1];
+      currentPageIndex = getPreferredFocusIndexForSpread(nextUnit, galleryDisplayState.mode);
+      renderCurrentPage();
+      return;
+    }
+  } else if (currentPageIndex < galleryPages.length - 1) {
     currentPageIndex += 1;
     renderCurrentPage();
-  } else if (currentGalleryIndex < currentGalleries.length - 1) {
+    return;
+  }
+
+  if (currentGalleryIndex < currentGalleries.length - 1) {
     loadGalleryByIndex(currentGalleryIndex + 1, 0);
   }
 }
@@ -1680,8 +2042,16 @@ function updateNavigationButtons() {
   const prevButton = document.getElementById('prevButton');
   const nextButton = document.getElementById('nextButton');
 
-  if (prevButton) prevButton.disabled = currentPageIndex <= 0 && currentGalleryIndex <= 0;
-  if (nextButton) nextButton.disabled = currentPageIndex >= galleryPages.length - 1 && currentGalleryIndex >= currentGalleries.length - 1;
+  const spread = getCurrentSpreadInfo();
+  const atFirstMedia = isSpreadViewMode(galleryDisplayState.mode)
+    ? spread.unitIndex <= 0
+    : currentPageIndex <= 0;
+  const atLastMedia = isSpreadViewMode(galleryDisplayState.mode)
+    ? spread.unitIndex >= spread.units.length - 1
+    : currentPageIndex >= galleryPages.length - 1;
+
+  if (prevButton) prevButton.disabled = atFirstMedia && currentGalleryIndex <= 0;
+  if (nextButton) nextButton.disabled = atLastMedia && currentGalleryIndex >= currentGalleries.length - 1;
 }
 
 function loadGalleryByIndex(galleryIndex, startAt) {
@@ -1807,10 +2177,13 @@ function showError(message) {
 }
 
 window.GalleryUtils = {
+  buildSpreadUnits,
   buildGalleryPages,
   extractExtension,
+  getGalleryViewModeLabel,
   inferVideoMimeType,
   isVideoPath,
+  normalizeGalleryViewMode,
   normalizeGalleryPageEntry,
   normalizePath,
   resolveAssetPath,

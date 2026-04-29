@@ -4,17 +4,16 @@
  */
 
 let siteStructure = null;
-let currentProject = null;
-let currentPerson = null;
-let currentGalleryPath = null;
+let currentGenre = null;
+let currentSeriesKey = null;
+let currentContentPath = null;
+let currentSeriesData = null;
 let currentGallery = null;
 let currentGalleries = [];
 let currentGalleryIndex = -1;
 let galleryPages = [];
 let currentPageIndex = 0;
 let thumbnailGenerationToken = 0;
-let currentProjectData = null;
-let currentPersonData = null;
 
 const ZOOM_LEVELS = [100, 150, 200, 250, 300, 350, 400, 500, 600, 700, 800, 1000, 1200, 1400, 1600];
 const ZOOM_MIN_PERCENT = ZOOM_LEVELS[0];
@@ -104,46 +103,33 @@ document.addEventListener('DOMContentLoaded', () => {
     siteStructure = window.siteStructure;
 
     const params = new URLSearchParams(window.location.search);
-    currentProject = decodeURIComponent(params.get('project') || '');
-    currentPerson = decodeURIComponent(params.get('person') || '');
-    currentGalleryPath = decodeURIComponent(params.get('gallery') || '');
+    currentGenre = decodeURIComponent(params.get('genre') || '');
+    currentSeriesKey = decodeURIComponent(params.get('series') || '');
+    currentContentPath = decodeURIComponent(params.get('content') || '');
 
-    if (!currentProject || !currentPerson || !currentGalleryPath) {
+    if (!currentGenre || !currentSeriesKey || !currentContentPath) {
       showError('ギャラリー情報がありません');
       return;
     }
 
-    if (!siteStructure[currentProject]) {
-      showError('企画が見つかりません');
+    currentSeriesData = Series.getEntryByKey(siteStructure, currentGenre, currentSeriesKey);
+    if (!currentSeriesData) {
+      showError('シリーズが見つかりません');
       return;
     }
 
-    const projectData = siteStructure[currentProject];
-    if (!projectData[currentPerson]) {
-      showError('人物が見つかりません');
-      return;
-    }
-
-    const personData = projectData[currentPerson];
-    if (!personData.galleries || personData.galleries.length === 0) {
+    currentGalleries = buildGalleriesForContent(currentContentPath);
+    if (currentGalleries.length === 0) {
       showError('ギャラリーが見つかりません');
       return;
     }
 
-    currentGalleries = personData.galleries;
-    currentGalleryIndex = currentGalleries.findIndex((g) => g.path === currentGalleryPath);
-    if (currentGalleryIndex === -1) {
-      showError('指定されたギャラリーが見つかりません');
-      return;
-    }
-
-    currentProjectData = projectData;
-    currentPersonData = personData;
+    currentGalleryIndex = 0;
     currentGallery = currentGalleries[currentGalleryIndex];
-    galleryPages = buildGalleryPages(currentGalleryPath, currentGallery);
+    galleryPages = buildGalleryPages(currentGallery.path, currentGallery);
     resetBackgroundThumbnailWarmup();
 
-    updateBreadcrumbs(projectData, personData);
+    updateBreadcrumbs();
     renderThumbnailStrip();
     setupNavigation();
     setupSearch();
@@ -158,6 +144,14 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 // ============ Data ============
+
+function buildGalleriesForContent(contentPath) {
+  const map = window.galleryPagesMap || {};
+  const normalized = normalizePath(contentPath);
+  if (map[normalized]) return [{ path: normalized }];
+  const prefix = normalized + '/';
+  return Object.keys(map).filter((k) => k.startsWith(prefix)).sort().map((k) => ({ path: k }));
+}
 
 function buildGalleryPages(galleryPath, galleryData) {
   const map = window.galleryPagesMap || {};
@@ -240,6 +234,7 @@ function normalizePath(path) {
 
 function resolveAssetPath(path) {
   const normalized = normalizePath(path);
+  if (normalized.startsWith('thumbnail/')) return encodeURI(normalized);
   if (normalized.startsWith('contents/')) return encodeURI(normalized);
   if (normalized.startsWith('photo/')) return encodeURI(`contents/${normalized}`);
   return encodeURI(normalized);
@@ -512,19 +507,17 @@ function flushPendingStageThumbnailUpdates() {
 
 // ============ Rendering ============
 
-function updateBreadcrumbs(projectData, personData) {
+function updateBreadcrumbs() {
   const breadcrumb = document.querySelector('.breadcrumbs-content');
-  const seriesName = Series.getProjectSeries(projectData);
-  const projectLabel = projectData.label || currentProject;
-  const personLabel = personData.label || currentPerson;
-  const galleryLabel = extractGalleryLabel(currentGalleryPath);
+  const genreName = Series.getGenreName(siteStructure, currentGenre);
+  const seriesName = currentSeriesData ? (currentSeriesData.name || currentSeriesKey) : currentSeriesKey;
+  const contentName = currentGallery ? (currentGallery.name || currentGallery.path || '') : (currentContentPath || '');
 
   Navigation.renderBreadcrumbs(breadcrumb, [
     { label: 'トップ', href: 'index.html' },
-    { label: seriesName, href: Series.buildSeriesHref(seriesName), className: 'breadcrumb-series', id: 'seriesLink' },
-    { label: projectLabel, href: `project.html?project=${encodeURIComponent(currentProject)}`, className: 'breadcrumb-project', id: 'projectLink' },
-    { label: personLabel, href: `person.html?project=${encodeURIComponent(currentProject)}&person=${encodeURIComponent(currentPerson)}`, className: 'breadcrumb-person', id: 'personLink' },
-    { label: galleryLabel, current: true, className: 'breadcrumb-current', id: 'galleryName' }
+    { label: genreName, href: Series.buildGenreHref(currentGenre), className: 'breadcrumb-genre', id: 'genreLink' },
+    { label: seriesName, href: Series.buildSeriesHref(currentGenre, currentSeriesKey), className: 'breadcrumb-series', id: 'seriesLink' },
+    { label: contentName, current: true, className: 'breadcrumb-current', id: 'galleryName' }
   ]);
 }
 
@@ -636,7 +629,7 @@ function renderStageContent(stage, page) {
   img.id = 'photoImage';
   img.className = 'media-stage-image';
   img.src = page.image;
-  img.alt = `${currentPerson} ${currentPageIndex + 1}`;
+  img.alt = `${currentGallery ? (currentGallery.name || currentGallery.path || '') : ''} ${currentPageIndex + 1}`;
 
   wrapper.appendChild(img);
   stage.prepend(wrapper);
@@ -1696,8 +1689,7 @@ function loadGalleryByIndex(galleryIndex, startAt) {
 
   currentGalleryIndex = galleryIndex;
   currentGallery = currentGalleries[currentGalleryIndex];
-  currentGalleryPath = currentGallery.path;
-  galleryPages = buildGalleryPages(currentGalleryPath, currentGallery);
+  galleryPages = buildGalleryPages(currentGallery.path, currentGallery);
 
   if (startAt === 'last') {
     currentPageIndex = Math.max(0, galleryPages.length - 1);
@@ -1715,9 +1707,7 @@ function loadGalleryByIndex(galleryIndex, startAt) {
   }
   thumbnailModeState.hasOpenedOnce = false;
 
-  if (currentProjectData && currentPersonData) {
-    updateBreadcrumbs(currentProjectData, currentPersonData);
-  }
+  updateBreadcrumbs();
   renderThumbnailStrip();
   renderCurrentPage();
   renderGalleryPageNav();

@@ -1,194 +1,101 @@
 /**
  * Search Utility Module
- * Provides search functionality for people and galleries
+ * Provides search functionality for persons and series entries.
  */
 
 const Search = (() => {
-  const PROJECT_META_KEYS = new Set(['label', 'banner', 'series']);
 
   function normalizeExternalUrl(rawUrl) {
-    if (typeof rawUrl !== 'string') {
-      return '';
-    }
-
+    if (typeof rawUrl !== 'string') return '';
     const url = rawUrl.trim();
-    if (!url) {
-      return '';
-    }
-
-    // Keep absolute URLs, anchors, and root-absolute paths unchanged.
-    if (/^(https?:|file:|mailto:|#|\/)/i.test(url)) {
-      return url;
-    }
-
-    if (url.startsWith('contents/')) {
-      return url;
-    }
-
-    return `contents/${url.replace(/^\.\//, '')}`;
+    if (!url) return '';
+    if (/^(https?:|file:|mailto:|#|\/)/i.test(url)) return url;
+    if (url.startsWith('contents/')) return url;
+    return 'contents/' + url.replace(/^\.\//, '');
   }
 
-  function getPersonExternalLinks(person) {
-    if (!person || !Array.isArray(person.exturl)) {
-      return [];
-    }
-
+  function getEntryExternalLinks(entryData) {
+    if (!entryData || !Array.isArray(entryData.exturl)) return [];
     const links = [];
-    for (const item of person.exturl) {
-      if (!item || typeof item !== 'object') {
-        continue;
-      }
-
+    for (const item of entryData.exturl) {
+      if (!item || typeof item !== 'object') continue;
       const caption = typeof item.caption === 'string' ? item.caption.trim() : '';
       const href = normalizeExternalUrl(item.url);
-      if (!caption || !href) {
-        continue;
-      }
-
-      links.push({ caption, url: href });
+      if (!href) continue;
+      links.push({ caption: caption || href, url: href });
     }
-
     return links;
   }
 
-  function matchesPersonName(personName, query, exactMatch = false) {
-    const normalizedQuery = String(query || '').trim().toLowerCase();
-    if (!normalizedQuery) {
-      return false;
-    }
+  // Legacy alias
+  function getPersonExternalLinks(entryData) {
+    return getEntryExternalLinks(entryData);
+  }
 
-    const normalizedPersonName = String(personName || '').trim().toLowerCase();
-    return exactMatch
-      ? normalizedPersonName === normalizedQuery
-      : normalizedPersonName.includes(normalizedQuery);
+  function matchesPersonName(name, query, exactMatch) {
+    const q = String(query || '').trim().toLowerCase();
+    if (!q) return false;
+    const n = String(name || '').trim().toLowerCase();
+    return exactMatch ? n === q : n.includes(q);
   }
 
   /**
-   * Search people by partial match
-   * @param {Object} structure - The structure.json data
-   * @param {string} query - Search query (person name partial text)
-   * @returns {Array} Array of matching results with format { project, person, galleries }
+   * Search series entries where main-person or persons[] match query.
+   * Returns results grouped by genre.
+   * @param {Object} structure - window.siteStructure
+   * @param {string} query
+   * @param {boolean} [exactMatch]
+   * @returns {Array<{genreName, genreKey, entries: Array}>}
    */
-  function searchPeople(structure, query) {
-    if (!query || query.trim().length === 0) {
-      return [];
-    }
+  function searchEntriesGroupedByGenre(structure, query, exactMatch) {
+    if (!query || !query.trim()) return [];
 
-    const results = [];
+    const genreMap = new Map();
 
-    for (const [projectKey, project] of Object.entries(structure || {})) {
-      for (const [personKey, person] of Object.entries(project || {})) {
-        if (PROJECT_META_KEYS.has(personKey)) {
-          continue;
-        }
+    for (const { genreKey, seriesKey, data } of Series.getAllSeriesEntries(structure)) {
+      const persons = Series.getPersonList(data);
+      const matchedPerson = persons.find(p => matchesPersonName(p, query, exactMatch));
+      if (!matchedPerson) continue;
 
-        if (typeof person !== 'object' || !person.galleries) {
-          continue;
-        }
-
-        const personName = person.label || personKey;
-        if (matchesPersonName(personName, query)) {
-          results.push({
-            project: projectKey,
-            projectLabel: project.label,
-            projectBanner: project.banner,
-            person: personKey,
-            personLabel: personName,
-            galleries: person.galleries,
-            extUrls: getPersonExternalLinks(person),
-          });
-        }
+      if (!genreMap.has(genreKey)) {
+        genreMap.set(genreKey, []);
       }
+      genreMap.get(genreKey).push({ genreKey, seriesKey, data, matchedPerson });
     }
 
-    return results;
+    return Array.from(genreMap.entries()).map(([genreKey, entries]) => ({
+      genreKey,
+      genreName: Series.getGenreName(structure, genreKey),
+      entries,
+    }));
   }
 
   /**
-   * Get all people and their galleries for display
-   * @param {Object} structure - The structure.json data
-   * @returns {Array} Array of all people with their galleries
+   * Legacy: search by project/person structure. Returns empty for new schema.
    */
-  function getAllPeople(structure) {
-    const allPeople = [];
-
-    for (const [projectKey, project] of Object.entries(structure || {})) {
-      for (const [personKey, person] of Object.entries(project)) {
-        if (personKey === 'label' || personKey === 'banner' || personKey === 'galleries') {
-          continue;
-        }
-
-        if (typeof person === 'object' && person.galleries) {
-          allPeople.push({
-            project: projectKey,
-            projectLabel: project.label,
-            projectBanner: project.banner,
-            person: personKey,
-            personLabel: person.label || personKey,
-            galleries: person.galleries,
-            extUrls: getPersonExternalLinks(person),
-          });
-        }
-      }
-    }
-
-    return allPeople;
-  }
-
-  /**
-   * Search people by partial match across all series, grouped by series
-   * @param {Object} structure - The full structure.json data (all series)
-   * @param {string} query - Search query (person name partial text or exact name)
-   * @param {boolean} exactMatch - If true, match exact name instead of partial text
-   * @returns {Array} Array of { series, projects: [{ projectKey, projectLabel, projectBanner, personKey, personLabel, galleries }] }
-   */
+  function searchPeople() { return []; }
+  function getAllPeople() { return []; }
   function searchPeopleGroupedBySeries(structure, query, exactMatch) {
-    if (!query || query.trim().length === 0) {
-      return [];
-    }
-
-    const seriesMap = new Map();
-
-    for (const [projectKey, project] of Object.entries(structure || {})) {
-      const seriesName = (typeof project.series === 'string' && project.series.trim())
-        ? project.series.trim()
-        : '未分類';
-
-      for (const [personKey, person] of Object.entries(project)) {
-        if (PROJECT_META_KEYS.has(personKey)) {
-          continue;
-        }
-        if (typeof person !== 'object' || !Array.isArray(person.galleries)) {
-          continue;
-        }
-
-        const personName = person.label || personKey;
-        const match = matchesPersonName(personName, query, exactMatch);
-
-        if (match) {
-          if (!seriesMap.has(seriesName)) {
-            seriesMap.set(seriesName, []);
-          }
-          seriesMap.get(seriesName).push({
-            projectKey,
-            projectLabel: project.label || projectKey,
-            projectBanner: project.banner || '',
-            personKey,
-            personLabel: personName,
-            galleries: person.galleries,
-            extUrls: getPersonExternalLinks(person),
-          });
-        }
-      }
-    }
-
-    return Array.from(seriesMap.entries()).map(([series, projects]) => ({ series, projects }));
+    return searchEntriesGroupedByGenre(structure, query, exactMatch)
+      .map(g => ({ series: g.genreName, projects: g.entries.map(e => ({
+        projectKey: e.seriesKey,
+        projectLabel: e.data.name || e.seriesKey,
+        personKey: e.matchedPerson,
+        personLabel: e.matchedPerson,
+        galleries: e.data.contents || [],
+        extUrls: getEntryExternalLinks(e.data),
+        genreKey: e.genreKey,
+        seriesKey: e.seriesKey,
+        data: e.data,
+      })) }));
   }
 
   return {
-    getPersonExternalLinks,
     normalizeExternalUrl,
+    getEntryExternalLinks,
+    getPersonExternalLinks,
     matchesPersonName,
+    searchEntriesGroupedByGenre,
     searchPeople,
     getAllPeople,
     searchPeopleGroupedBySeries,

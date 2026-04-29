@@ -15,7 +15,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const siteConfig = window.siteConfig || {};
 
     const sidebar = document.getElementById('seriesSidebar');
-    Series.renderSeriesSidebar(sidebar, siteStructure, '');
+    Series.renderGenreSidebar(sidebar, siteStructure, '');
 
     renderPersonsList(siteStructure);
     setupSearch(siteStructure);
@@ -80,19 +80,13 @@ function renderPersonsList(structure) {
 function collectAllPersons(structure) {
   const personMap = new Map();
 
-  for (const [, project] of Object.entries(structure || {})) {
-    for (const [personKey, person] of Object.entries(project)) {
-      if (personKey === 'label' || personKey === 'banner' || personKey === 'series') {
-        continue;
+  for (const { data } of Series.getAllSeriesEntries(structure)) {
+    for (const name of Series.getPersonList(data)) {
+      if (!name) continue;
+      if (!personMap.has(name)) {
+        personMap.set(name, { label: name, galleryCount: 0 });
       }
-      if (typeof person !== 'object' || !Array.isArray(person.galleries)) {
-        continue;
-      }
-      const label = person.label || personKey;
-      if (!personMap.has(label)) {
-        personMap.set(label, { label, galleryCount: 0 });
-      }
-      personMap.get(label).galleryCount += person.galleries.length;
+      personMap.get(name).galleryCount += Series.getContentCount(data);
     }
   }
 

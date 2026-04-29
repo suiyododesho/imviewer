@@ -154,6 +154,52 @@ class MaintBuildStructureTests(unittest.TestCase):
 
         self.assertEqual(cover, "photo/alpha/book01/src/thumbnail/cover.jpg")
 
+    def test_generate_contents_entries_uses_generated_pdf_directory_not_pdf_file(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            site_dir = Path(tmp)
+            contents_dir = site_dir / "contents"
+            series_dir = contents_dir / "comic" / "series-a"
+            series_dir.mkdir(parents=True)
+            (series_dir / "book01.pdf").write_bytes(b"%PDF-1.7")
+
+            def _fake_extract(pdf_abs, out_dir_abs, **_kwargs):
+                out_dir = Path(out_dir_abs)
+                out_dir.mkdir(parents=True, exist_ok=True)
+                (out_dir / "001.jpg").write_bytes(b"jpeg")
+                return [str(out_dir / "001.jpg")]
+
+            with (
+                patch.object(maint_structure_lib, "CONTENTS_DIR", str(contents_dir)),
+                patch.object(maint_structure_lib, "SITE_DIR", str(site_dir)),
+                patch.object(maint_structure_lib, "extract_pdf_pages_to_dir", side_effect=_fake_extract),
+            ):
+                entries = maint_structure_lib.generate_contents_entries("comic/series-a")
+
+        self.assertEqual([item["path"] for item in entries], ["comic/series-a/book01_pdf"])
+
+    def test_generate_contents_entries_uses_generated_cbz_directory_not_cbz_file(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            site_dir = Path(tmp)
+            contents_dir = site_dir / "contents"
+            series_dir = contents_dir / "comic" / "series-b"
+            series_dir.mkdir(parents=True)
+            (series_dir / "book02.cbz").write_bytes(b"PK")
+
+            def _fake_extract(cbz_abs, out_dir_abs, **_kwargs):
+                out_dir = Path(out_dir_abs)
+                out_dir.mkdir(parents=True, exist_ok=True)
+                (out_dir / "001.jpg").write_bytes(b"jpeg")
+                return [str(out_dir / "001.jpg")]
+
+            with (
+                patch.object(maint_structure_lib, "CONTENTS_DIR", str(contents_dir)),
+                patch.object(maint_structure_lib, "SITE_DIR", str(site_dir)),
+                patch.object(maint_structure_lib, "extract_cbz_pages_to_dir", side_effect=_fake_extract),
+            ):
+                entries = maint_structure_lib.generate_contents_entries("comic/series-b")
+
+        self.assertEqual([item["path"] for item in entries], ["comic/series-b/book02_cbz"])
+
 
 if __name__ == "__main__":
     unittest.main()

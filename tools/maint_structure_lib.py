@@ -16,7 +16,7 @@ STRUCTURE_JS_PATH = os.path.join(SITE_DIR, "js", "structure.js")
 GENRE_META_KEYS = {"name", "path", "note", "labels"}
 THUMBNAIL_DIR_SUFFIXES = (
     "_tn", "_pdf_tn", "_cbz_tn", "_zip_tn",  # legacy
-    "_pdf", "_cbz", "_zip", "_rar", "_7z",  # current
+    "_zip", "_rar", "_7z",  # legacy/current non-gallery generated caches
 )
 MEDIA_FILE_EXTENSIONS = {
     ".pdf",
@@ -49,8 +49,12 @@ DIRECT_IMAGE_EXTENSIONS = frozenset({".jpg", ".jpeg", ".png", ".webp", ".gif", "
 DIRECT_VIDEO_EXTENSIONS = frozenset({".mp4", ".mkv", ".avi", ".mov", ".wmv", ".mpeg", ".mpg"})
 # DPI for rendering PDF pages as JPEG images
 PDF_RENDER_DPI = 150
+# DPI for rendering PDF pages as gallery content images.
+CONTENT_RENDER_DPI = 200
 # Long edge size (px) used for all generated thumbnails.
 THUMBNAIL_LONG_EDGE_PX = 200
+# Long edge size (px) used for generated gallery content images.
+CONTENT_LONG_EDGE_PX = 2200
 
 
 def norm_rel(path: str) -> str:
@@ -177,7 +181,7 @@ def generate_contents_entries(series_root_rel: str) -> list[dict]:
         return []
 
     subdirs: list[str] = []
-    archive_files: list[str] = []
+    archive_files: list[tuple[str, str]] = []
     has_direct_media = False
 
     for child_name in sorted(os.listdir(series_root_abs), key=str.lower):
@@ -190,14 +194,42 @@ def generate_contents_entries(series_root_rel: str) -> list[dict]:
             subdirs.append(child_name)
         elif os.path.isfile(child_abs):
             ext = os.path.splitext(child_name)[1].lower()
-            if ext in ARCHIVE_CONTENT_EXTENSIONS:
-                archive_files.append(child_name)
+            if ext == ".pdf":
+                archive_files.append((child_name, "pdf"))
+            elif ext == ".cbz":
+                archive_files.append((child_name, "cbz"))
             elif ext in DIRECT_IMAGE_EXTENSIONS | DIRECT_VIDEO_EXTENSIONS:
                 has_direct_media = True
 
+    generated_archive_dirs: list[str] = []
+    for archive_name, archive_kind in archive_files:
+        archive_abs = os.path.join(series_root_abs, archive_name)
+        archive_rel = norm_rel(os.path.join(normalized_root, archive_name))
+        if archive_kind == "pdf":
+            target_rel = get_pdf_content_dir_rel(archive_rel)
+            extract_kwargs = {"dpi": CONTENT_RENDER_DPI, "long_edge_px": CONTENT_LONG_EDGE_PX}
+            extractor = extract_pdf_pages_to_dir
+        else:
+            target_rel = get_cbz_content_dir_rel(archive_rel)
+            extract_kwargs = {"long_edge_px": CONTENT_LONG_EDGE_PX}
+            extractor = extract_cbz_pages_to_dir
+
+        target_abs = os.path.join(CONTENTS_DIR, target_rel)
+        try:
+            extractor(archive_abs, target_abs, **extract_kwargs)
+        except Exception as exc:
+            print(f"  [archive extract error] {archive_rel}: {exc}")
+            continue
+
+        target_name = os.path.basename(target_rel)
+        if os.path.isdir(target_abs):
+            generated_archive_dirs.append(target_name)
+
     # If the directory contains only raw images/videos (no subdirs, no archives),
     # treat the directory itself as a single gallery content entry.
-    if not subdirs and not archive_files:
+    all_subdirs = sorted(set(subdirs + generated_archive_dirs), key=str.lower)
+
+    if not all_subdirs and not archive_files:
         if has_direct_media:
             return [{
                 "path": normalized_root,
@@ -208,7 +240,7 @@ def generate_contents_entries(series_root_rel: str) -> list[dict]:
         return []
 
     entries: list[dict] = []
-    for child_name in subdirs + archive_files:
+    for child_name in all_subdirs:
         child_rel = norm_rel(os.path.join(normalized_root, child_name))
         entries.append({
             "path": child_rel,
@@ -253,7 +285,7 @@ def collect_gallery_file_paths_for_content(content_path: str) -> list[str]:
     """Return gallery entry paths for a content item.
 
     For HTML content or directories containing HTML: returns the HTML file paths.
-    For PDF/CBZ files or directories containing them: returns those file paths.
+    For archive-backed content directories: returns the generated directory path.
     For directories containing only raw images/videos: returns the directory path itself.
     """
     normalized = norm_rel(content_path)
@@ -265,8 +297,14 @@ def collect_gallery_file_paths_for_content(content_path: str) -> list[str]:
     # Single file
     if os.path.isfile(abs_path):
         ext = os.path.splitext(normalized)[1].lower()
-        if ext in {".html", ".htm"} | ARCHIVE_CONTENT_EXTENSIONS:
+        if ext in {".html", ".htm"}:
             return [normalized]
+        if ext == ".pdf":
+            generated = get_pdf_content_dir_rel(normalized)
+            return [generated] if os.path.isdir(os.path.join(CONTENTS_DIR, generated)) else []
+        if ext == ".cbz":
+            generated = get_cbz_content_dir_rel(normalized)
+            return [generated] if os.path.isdir(os.path.join(CONTENTS_DIR, generated)) else []
         return []
 
     if not os.path.isdir(abs_path):
@@ -277,8 +315,8 @@ def collect_gallery_file_paths_for_content(content_path: str) -> list[str]:
     if html_files:
         return html_files
 
-    # No HTML: return PDF/CBZ files in the directory
-    archive_paths: list[str] = []
+    # No HTML: include generated archive directories if present.
+    generated_archive_paths: list[str] = []
     try:
         children = sorted(os.listdir(abs_path), key=str.lower)
     except OSError:
@@ -288,11 +326,10 @@ def collect_gallery_file_paths_for_content(content_path: str) -> list[str]:
             continue
         if _looks_like_generated_thumbnail_dir(name):
             continue
-        ext = os.path.splitext(name)[1].lower()
-        if ext in ARCHIVE_CONTENT_EXTENSIONS:
-            archive_paths.append(norm_rel(os.path.join(normalized, name)))
-    if archive_paths:
-        return archive_paths
+        if name.lower().endswith("_pdf") or name.lower().endswith("_cbz"):
+            generated_archive_paths.append(norm_rel(os.path.join(normalized, name)))
+    if generated_archive_paths:
+        return generated_archive_paths
 
     # No HTML, no archives: if directory has raw images/videos, use directory itself
     for name in children:
@@ -326,6 +363,18 @@ def get_cbz_thumb_dir_rel(cbz_rel: str) -> str:
     return f"thumbnail/{stem}_cbz"
 
 
+def get_pdf_content_dir_rel(pdf_rel: str) -> str:
+    """Return the relative path of the generated content directory for a PDF file."""
+    stem = os.path.splitext(norm_rel(pdf_rel))[0]
+    return f"{stem}_pdf"
+
+
+def get_cbz_content_dir_rel(cbz_rel: str) -> str:
+    """Return the relative path of the generated content directory for a CBZ file."""
+    stem = os.path.splitext(norm_rel(cbz_rel))[0]
+    return f"{stem}_cbz"
+
+
 def resize_image_to_long_edge(image, long_edge_px: int = THUMBNAIL_LONG_EDGE_PX):
     """Resize PIL image so that its long edge becomes long_edge_px.
 
@@ -344,7 +393,12 @@ def resize_image_to_long_edge(image, long_edge_px: int = THUMBNAIL_LONG_EDGE_PX)
     return rgb.resize(new_size, Image.Resampling.LANCZOS)
 
 
-def extract_pdf_pages_to_dir(pdf_abs: str, thumb_dir_abs: str, dpi: int = PDF_RENDER_DPI) -> list[str]:
+def extract_pdf_pages_to_dir(
+    pdf_abs: str,
+    thumb_dir_abs: str,
+    dpi: int = PDF_RENDER_DPI,
+    long_edge_px: int | None = THUMBNAIL_LONG_EDGE_PX,
+) -> list[str]:
     """Render each PDF page as a JPEG image into thumb_dir_abs.
 
     Skips pages that already exist and are newer than the PDF.
@@ -369,19 +423,19 @@ def extract_pdf_pages_to_dir(pdf_abs: str, thumb_dir_abs: str, dpi: int = PDF_RE
             if needs_render:
                 # Render close to target size first, then normalize exactly to long-edge rule.
                 page_long_edge = max(float(page.rect.width), float(page.rect.height))
-                target_scale = THUMBNAIL_LONG_EDGE_PX / page_long_edge if page_long_edge > 0 else 1.0
+                target_scale = (long_edge_px / page_long_edge) if (long_edge_px and page_long_edge > 0) else 1.0
                 base_scale = dpi / 72.0
-                scale = min(base_scale, max(target_scale, 0.01))
+                scale = min(base_scale, max(target_scale, 0.01)) if long_edge_px else max(base_scale, 0.01)
                 pix = page.get_pixmap(matrix=fitz.Matrix(scale, scale), alpha=False)
                 with Image.frombytes("RGB", [pix.width, pix.height], pix.samples) as im:
-                    thumb = resize_image_to_long_edge(im)
-                    thumb.save(dst, format="JPEG", quality=85, optimize=True)
+                    out = resize_image_to_long_edge(im, long_edge_px) if long_edge_px else im.convert("RGB")
+                    out.save(dst, format="JPEG", quality=85, optimize=True)
             output_paths.append(dst)
 
     return output_paths
 
 
-def extract_cbz_pages_to_dir(cbz_abs: str, thumb_dir_abs: str) -> list[str]:
+def extract_cbz_pages_to_dir(cbz_abs: str, thumb_dir_abs: str, long_edge_px: int | None = THUMBNAIL_LONG_EDGE_PX) -> list[str]:
     """Extract images from a CBZ (zip) archive into thumb_dir_abs as numbered JPEGs.
 
     Skips files that already exist and are newer than the archive.
@@ -390,7 +444,7 @@ def extract_cbz_pages_to_dir(cbz_abs: str, thumb_dir_abs: str) -> list[str]:
     import io
     import zipfile
 
-    from PIL import Image
+    from PIL import Image, ImageOps
 
     os.makedirs(thumb_dir_abs, exist_ok=True)
     cbz_mtime = os.path.getmtime(cbz_abs)
@@ -413,8 +467,9 @@ def extract_cbz_pages_to_dir(cbz_abs: str, thumb_dir_abs: str) -> list[str]:
             if needs_extract:
                 data = zf.read(name)
                 with Image.open(io.BytesIO(data)) as im:
-                    thumb = resize_image_to_long_edge(im)
-                    thumb.save(dst, format="JPEG", quality=85, optimize=True)
+                    prepared = ImageOps.exif_transpose(im)
+                    out = resize_image_to_long_edge(prepared, long_edge_px) if long_edge_px else prepared.convert("RGB")
+                    out.save(dst, format="JPEG", quality=85, optimize=True)
             output_paths.append(dst)
 
     return output_paths

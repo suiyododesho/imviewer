@@ -13,21 +13,19 @@ from PIL import Image, ImageOps
 try:
     from .history_manager import parse_history
     from .maint_structure_lib import (
-        ARCHIVE_CONTENT_EXTENSIONS, CONTENTS_DIR, DIRECT_IMAGE_EXTENSIONS,
+        CONTENTS_DIR, DIRECT_IMAGE_EXTENSIONS,
         DIRECT_VIDEO_EXTENSIONS, SITE_DIR, STRUCTURE_JSON_PATH, THUMBNAIL_LONG_EDGE_PX,
         collect_gallery_file_paths_for_content, collect_gallery_html_paths_for_content,
-        extract_cbz_pages_to_dir, extract_pdf_pages_to_dir,
-        get_cbz_thumb_dir_rel, get_pdf_thumb_dir_rel,
+        get_cbz_content_dir_rel, get_pdf_content_dir_rel,
         iter_content_entries, load_structure, norm_rel, resize_image_to_long_edge,
     )
 except ImportError:
     from history_manager import parse_history
     from maint_structure_lib import (
-        ARCHIVE_CONTENT_EXTENSIONS, CONTENTS_DIR, DIRECT_IMAGE_EXTENSIONS,
+        CONTENTS_DIR, DIRECT_IMAGE_EXTENSIONS,
         DIRECT_VIDEO_EXTENSIONS, SITE_DIR, STRUCTURE_JSON_PATH, THUMBNAIL_LONG_EDGE_PX,
         collect_gallery_file_paths_for_content, collect_gallery_html_paths_for_content,
-        extract_cbz_pages_to_dir, extract_pdf_pages_to_dir,
-        get_cbz_thumb_dir_rel, get_pdf_thumb_dir_rel,
+        get_cbz_content_dir_rel, get_pdf_content_dir_rel,
         iter_content_entries, load_structure, norm_rel, resize_image_to_long_edge,
     )
 
@@ -267,50 +265,21 @@ def ensure_gallery_prebuilt_thumbnails(gallery_path, pages):
     return generated, reused
 
 
-def gather_pages_from_pdf(pdf_content_rel: str) -> list[dict]:
-    """Extract all pages of a PDF file as images and return page entries."""
-    pdf_abs = os.path.join(CONTENTS_DIR, norm_rel(pdf_content_rel))
-    if not os.path.isfile(pdf_abs):
-        return []
-    thumb_dir_rel = get_pdf_thumb_dir_rel(pdf_content_rel)
-    thumb_dir_abs = os.path.join(SITE_DIR, thumb_dir_rel)
-    try:
-        page_paths = extract_pdf_pages_to_dir(pdf_abs, thumb_dir_abs)
-    except Exception as exc:
-        print(f"  [PDF error] {pdf_content_rel}: {exc}")
-        return []
-    pages = []
-    for abs_path in page_paths:
-        img_rel = norm_rel(os.path.relpath(abs_path, SITE_DIR))
-        pages.append({
-            'type': 'image',
-            'image': img_rel,
-            'html': f'contents/{norm_rel(pdf_content_rel)}',
-        })
-    return pages
+def resolve_gallery_source_path(gallery_path: str) -> str:
+    """Return a concrete gallery source path.
 
-
-def gather_pages_from_cbz(cbz_content_rel: str) -> list[dict]:
-    """Extract all images from a CBZ archive and return page entries."""
-    cbz_abs = os.path.join(CONTENTS_DIR, norm_rel(cbz_content_rel))
-    if not os.path.isfile(cbz_abs):
-        return []
-    thumb_dir_rel = get_cbz_thumb_dir_rel(cbz_content_rel)
-    thumb_dir_abs = os.path.join(SITE_DIR, thumb_dir_rel)
-    try:
-        page_paths = extract_cbz_pages_to_dir(cbz_abs, thumb_dir_abs)
-    except Exception as exc:
-        print(f"  [CBZ error] {cbz_content_rel}: {exc}")
-        return []
-    pages = []
-    for abs_path in page_paths:
-        img_rel = norm_rel(os.path.relpath(abs_path, SITE_DIR))
-        pages.append({
-            'type': 'image',
-            'image': img_rel,
-            'html': f'contents/{norm_rel(cbz_content_rel)}',
-        })
-    return pages
+    New flow stores extracted pages in directories (e.g. xxx_pdf/, xxx_cbz/).
+    Keep legacy compatibility by mapping pdf/cbz paths to those directories if present.
+    """
+    normalized = norm_rel(gallery_path)
+    ext = os.path.splitext(normalized)[1].lower()
+    if ext == '.pdf':
+        mapped = get_pdf_content_dir_rel(normalized)
+        return mapped if os.path.isdir(os.path.join(CONTENTS_DIR, mapped)) else normalized
+    if ext == '.cbz':
+        mapped = get_cbz_content_dir_rel(normalized)
+        return mapped if os.path.isdir(os.path.join(CONTENTS_DIR, mapped)) else normalized
+    return normalized
 
 
 def iter_gallery_paths(structure_obj):
@@ -399,30 +368,19 @@ def build_gallery_pages_map(structure: dict, diff: bool = False) -> tuple[dict, 
     thumb_generated = 0
     thumb_reused = 0
     for gallery_path in target_gallery_paths:
-        ext = os.path.splitext(gallery_path)[1].lower()
-        gallery_abs = os.path.join(CONTENTS_DIR, gallery_path)
-        if ext == '.pdf':
-            pages = gather_pages_from_pdf(gallery_path)
-            # PDF pages are already at display resolution; generate gallery thumbnails
-            generated_count, reused_count = ensure_gallery_prebuilt_thumbnails(gallery_path, pages)
-            thumb_generated += generated_count
-            thumb_reused += reused_count
-        elif ext == '.cbz':
-            pages = gather_pages_from_cbz(gallery_path)
-            generated_count, reused_count = ensure_gallery_prebuilt_thumbnails(gallery_path, pages)
-            thumb_generated += generated_count
-            thumb_reused += reused_count
-        elif os.path.isdir(gallery_abs):
-            pages = gather_media_from_gallery_tree(gallery_path)
+        source_gallery_path = resolve_gallery_source_path(gallery_path)
+        gallery_abs = os.path.join(CONTENTS_DIR, source_gallery_path)
+        if os.path.isdir(gallery_abs):
+            pages = gather_media_from_gallery_tree(source_gallery_path)
             pages = dedupe_pages(pages)
-            generated_count, reused_count = ensure_gallery_prebuilt_thumbnails(gallery_path, pages)
+            generated_count, reused_count = ensure_gallery_prebuilt_thumbnails(source_gallery_path, pages)
             thumb_generated += generated_count
             thumb_reused += reused_count
         else:
-            pages_by_link = gather_gallery_pages(gallery_path)
-            pages_by_scan = gather_media_from_gallery_tree(gallery_path)
+            pages_by_link = gather_gallery_pages(source_gallery_path)
+            pages_by_scan = gather_media_from_gallery_tree(source_gallery_path)
             pages = dedupe_pages(pages_by_link + pages_by_scan)
-            generated_count, reused_count = ensure_gallery_prebuilt_thumbnails(gallery_path, pages)
+            generated_count, reused_count = ensure_gallery_prebuilt_thumbnails(source_gallery_path, pages)
             thumb_generated += generated_count
             thumb_reused += reused_count
         if not pages:

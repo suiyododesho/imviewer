@@ -4,6 +4,34 @@
 
 ## メンテナンスツール
 
+`tools/build_gallery_pages_map.py` は、`site/structure.json` と関連JSを再生成する統合エントリです。
+
+### 実行と出力
+
+- 実行コマンド: `python tools/build_gallery_pages_map.py`
+- 差分モード: `python tools/build_gallery_pages_map.py --diff`
+- 主な出力:
+  - `site/structure.json`
+  - `site/js/structure.js`
+  - `site/js/gallery-pages.js`
+
+### 再作成条件
+
+- `structure.json` の `contents` 再構築は、現状の実装では `--diff` 指定時も全シリーズを対象に実行される。
+- PDF/CBZ からのコンテンツ画像抽出処理（`*_pdf/`, `*_cbz/` ディレクトリ生成）は、対象シリーズの走査時に毎回呼ばれる。
+- ただし、実ファイルの再生成はタイムスタンプで抑制される。
+  - PDF: 既存ページ画像 (`001.jpg` など) の更新時刻が PDF ファイルより新しい、または同等なら再レンダリングしない。
+  - CBZ: 既存ページ画像の更新時刻が CBZ ファイルより新しい、または同等なら再抽出しない。
+  - 既存ページ画像が無い場合、またはアーカイブの方が新しい場合のみ、そのページを再生成する。
+- `gallery-pages.js` は毎回再書き込みされる。
+  - ただし `--diff` かつ既存 `gallery-pages.js` がある場合は、`history.txt` の `next.dirs` と `next.force_dirs` に一致するギャラリーのみ再計算する。
+  - 再計算対象外のギャラリーは既存マップを再利用する。
+
+### 補足
+
+- PDF/CBZ の元ファイルは保持し、削除しない。
+- `structure.json` に載せるのは、抽出後の `*_pdf/`, `*_cbz/` ディレクトリのパスであり、PDF/CBZ ファイルパスは載せない。
+
 ## リリース作業ツール
 
 ## 動画コンバータツール

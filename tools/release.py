@@ -25,6 +25,10 @@ import zipfile
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from history_manager import parse_history, write_history  # noqa: E402
 
+# Windows の cp1252 環境でも日本語を print できるよう stdout を UTF-8 に固定する
+sys.stdout.reconfigure(encoding="utf-8")
+sys.stderr.reconfigure(encoding="utf-8")
+
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 SITE_DIR = os.path.join(ROOT, "site")
 TOOLS_DIR = os.path.join(ROOT, "tools")

@@ -1,0 +1,35 @@
+{
+  "contents-root": "contents",
+  "genres": {
+    "comic": {
+      "name": "漫画",
+      "path": "comic",
+      "00001": {
+        "path": "",
+        "name": "",
+        "series": "",
+        "main-person": "",
+        "persons": [],
+        "labels": [],
+        "note": "",
+        "contents": [],
+        "exturl": []
+      }
+    },
+    "photo": {
+      "name": "写真集",
+      "path": "photo",
+      "00001": {
+        "path": "",
+        "name": "",
+        "series": "",
+        "main-person": "",
+        "persons": [],
+        "labels": [],
+        "note": "",
+        "contents": [],
+        "exturl": []
+      }
+    }
+  }
+}

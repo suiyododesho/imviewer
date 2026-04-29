@@ -154,7 +154,7 @@ def _collect_structure_release_targets() -> tuple[set[str], set[str], set[str]]:
     thumbnail_paths: set[str] = set()
     banner_paths: set[str] = set()
 
-    def add_photo_parent(raw_path: str) -> None:
+    def add_photo_target(raw_path: str) -> None:
         normalized = _normalize_release_rel_path(raw_path)
         if not normalized or "://" in normalized or normalized.startswith(("#", "mailto:", "javascript:")):
             return
@@ -163,9 +163,17 @@ def _collect_structure_release_targets() -> tuple[set[str], set[str], set[str]]:
         if not normalized.startswith("photo/"):
             return
 
-        parent = os.path.dirname(normalized).replace("\\", "/").rstrip("/")
-        if parent:
-            photo_dirs.add(parent)
+        if normalized == "photo":
+            return
+
+        ext = os.path.splitext(normalized)[1].lower()
+        if ext:
+            parent = os.path.dirname(normalized).replace("\\", "/").rstrip("/")
+            if parent:
+                photo_dirs.add(parent)
+            return
+
+        photo_dirs.add(normalized.rstrip("/"))
 
     def visit(node) -> None:
         if isinstance(node, dict):
@@ -173,7 +181,7 @@ def _collect_structure_release_targets() -> tuple[set[str], set[str], set[str]]:
                 if isinstance(value, str):
                     normalized = _normalize_release_rel_path(value)
                     if key in {"path", "url"}:
-                        add_photo_parent(normalized)
+                        add_photo_target(normalized)
                     elif key == "thumbnail" and normalized.startswith("thumbnail/"):
                         thumbnail_paths.add(normalized)
                     elif key == "banner" and normalized.startswith("banner/"):

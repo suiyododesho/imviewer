@@ -10,17 +10,30 @@ from tools import release
 class ReleaseFilterTests(unittest.TestCase):
     def test_collect_structure_targets_from_structure_json(self):
         sample = {
-            "project-a": {
-                "banner": "banner/sample.jpg",
-                "person-a": {
-                    "exturl": [{"url": "photo/alpha/orig/index_orig.html"}],
-                    "galleries": [
-                        {
-                            "path": "photo/alpha/main/index_main.html",
-                            "thumbnail": "thumbnail/alpha_001.jpg",
-                        }
-                    ],
-                },
+            "contents-root": "contents",
+            "genres": {
+                "photo": {
+                    "name": "写真集",
+                    "path": "photo",
+                    "00001": {
+                        "path": "photo/alpha",
+                        "name": "Alpha",
+                        "series": "Alpha",
+                        "main-person": "",
+                        "persons": [],
+                        "labels": [],
+                        "note": "",
+                        "contents": [
+                            {
+                                "path": "photo/alpha/main",
+                                "cover": "photo/alpha/main/src/thumbnail/cover.jpg",
+                                "name": "main",
+                                "note": "",
+                            }
+                        ],
+                        "exturl": [{"url": "photo/alpha/orig/index_orig.html"}],
+                    }
+                }
             }
         }
 
@@ -33,20 +46,30 @@ class ReleaseFilterTests(unittest.TestCase):
 
         self.assertIn("photo/alpha/main", photo_dirs)
         self.assertIn("photo/alpha/orig", photo_dirs)
-        self.assertIn("thumbnail/alpha_001.jpg", thumbnails)
-        self.assertIn("banner/sample.jpg", banners)
+        self.assertEqual(thumbnails, set())
+        self.assertEqual(banners, set())
 
     def test_split_releasable_photo_dirs_skips_unreferenced_history_dirs(self):
         sample = {
-            "project-a": {
-                "person-a": {
-                    "galleries": [
-                        {
-                            "path": "photo/alpha/main/index_main.html",
-                            "thumbnail": "thumbnail/alpha_001.jpg",
-                        }
-                    ],
-                },
+            "contents-root": "contents",
+            "genres": {
+                "photo": {
+                    "name": "写真集",
+                    "path": "photo",
+                    "00001": {
+                        "path": "photo/alpha",
+                        "name": "Alpha",
+                        "series": "Alpha",
+                        "main-person": "",
+                        "persons": [],
+                        "labels": [],
+                        "note": "",
+                        "contents": [
+                            {"path": "photo/alpha/main", "cover": "", "name": "main", "note": ""}
+                        ],
+                        "exturl": [],
+                    }
+                }
             }
         }
 
@@ -65,15 +88,25 @@ class ReleaseFilterTests(unittest.TestCase):
 
     def test_force_dirs_are_always_included(self):
         sample = {
-            "project-a": {
-                "person-a": {
-                    "galleries": [
-                        {
-                            "path": "photo/alpha/main/index_main.html",
-                            "thumbnail": "thumbnail/alpha_001.jpg",
-                        }
-                    ],
-                },
+            "contents-root": "contents",
+            "genres": {
+                "photo": {
+                    "name": "写真集",
+                    "path": "photo",
+                    "00001": {
+                        "path": "photo/alpha",
+                        "name": "Alpha",
+                        "series": "Alpha",
+                        "main-person": "",
+                        "persons": [],
+                        "labels": [],
+                        "note": "",
+                        "contents": [
+                            {"path": "photo/alpha/main", "cover": "", "name": "main", "note": ""}
+                        ],
+                        "exturl": [],
+                    }
+                }
             }
         }
 

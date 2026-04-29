@@ -14,65 +14,57 @@
 
 ## コンテンツのディレクトリ構成
 コンテンツは、以下のようなディレクトリ構成を持つことを想定する。
-単純に、画像が入ったディレクトリやPDF、cbzなどのファイルが`contents/`以下に階層化されて配置されるというだけである。
+コンテンツ原本(`contents/`)とサムネイル生成物(`thumbnail/`)を分離し、同一の相対階層で管理する。
 
 ```
 contents/
-
 ├── photobook/
-│   ├── xxx/
-│   │   ├──xyz/
-│   │       ├── xyz_01.cbz
-│   │       ├── xyz_01_cbz_tn/
-│   │       │    ├── cover.jpg
-│   │       ├── xyz_02.cbz
-│   │       ├── xyz_02_cover.jpg
-│   │       ├── xyz_02_cbz_tn/
-│   │       │    ├── cover.jpg
-│   │       ├── ...
-│   │
-│   ├──hij.cbz
-│   ├──hij_cbz_tn/
-│   │  ├──cover.jpg
-│   ├──klm.cbz
-│   ├──klm_cbz_tn/
-│   │  ├──cover.jpg
-│
+│   └── xxx/
+│       └── xyz/
+│           ├── xyz_01.cbz
+│           ├── xyz_02.cbz
+│           └── ...
 ├── comic/
-│   ├── yyy/
-│   │   ├── yyy_vol1/
-│   │   │   ├── thumbnail/
-│   │   │   ├── hoge.jpg
-│   │   │   ├── huga.jpg
-│   │   │   ├── ...
-│   │   ├── yyy_vol2/
-│   │   │   ├── thumbnail/
-│   │   │   ├── hoge.jpg
-│   │   │   ├── huga.jpg
-│   │   │   ├── ...
-│   │
-│   ├── zzz/
-│   │   ├── zzz_vol1.pdf
-│   │   ├── zzz_vol1_pdf_tn/
-│   │   │    ├── cover.jpg
-│   │   ├── zzz_vol2.pdf
-│   │   ├── zzz_vol2_pdf_tn/
-│   │   │    ├── cover.jpg
-│   │   ├── zzz_vol3.pdf
-│   │   ├── zzz_vol3_pdf_tn/
-│   │   │    ├── cover.jpg
-│   ...
-├── structure.json
-├── index.html
-├── (あとは必要に応じて作る)
+│   └── zzz/
+│       ├── zzz_vol1.pdf
+│       ├── zzz_vol2.pdf
+│       └── zzz_vol3.pdf
+
+thumbnail/
+├── photobook/
+│   └── xxx/
+│       └── xyz/
+│           ├── xyz_01_cbz/
+│           │   ├── cover.jpg
+│           │   ├── 001.jpg
+│           │   └── ...
+│           └── xyz_02_cbz/
+│               ├── cover.jpg
+│               ├── 001.jpg
+│               └── ...
+├── comic/
+│   └── zzz/
+│       ├── zzz_vol1_pdf/
+│       │   ├── cover.jpg
+│       │   ├── 001.jpg
+│       │   └── ...
+│       ├── zzz_vol2_pdf/
+│       └── zzz_vol3_pdf/
+
+structure.json
+index.html
+(あとは必要に応じて作る)
 ```
 
 - index.htmlは、トップページ。
-- contents以下は、コンテンツを格納するディレクトリ。`photobook/`や`comic/`は、コンテンツのサブディレクトリ。`photobook/`や`comic/`の中には、さらにサブディレクトリを介して画像やPDFなどのファイルが格納されるケースが多い。(`photobook/`や`comic/`はあくまで例であり、実際のディレクトリ名は任意である)
-  - 画像ディレクトリ配下の`thumbnail`は、サムネイル画像を格納するディレクトリ。サムネイル画像は、ナビゲーションhtmlで利用する。
-  - pdfやcbzなどのファイルとサムネイル画像は、同一ディレクトリに配置する。例えば、`hij.cbz`と`hij_cbz_tn/`のようにする。
-  - サムネイル画像フォルダには`cover.jpg`という名前で表紙用のサムネイル画像を配置することを想定する。例えば、`hij_cbz_tn/cover.jpg`のようにする。これがナビゲーションhtmlで企画バナーやギャラリーサムネイルとして利用されるイメージである。
-  - サムネイル画像フォルダには連番でサムネイル画像を保存する。これはコンテンツの表示画面で利用されるイメージである。例えば、`hij_cbz_tn/001.jpg`、`hij_cbz_tn/002.jpg`のようにする。
+- contents以下は、コンテンツ原本を格納するディレクトリ。`photobook/`や`comic/`は、コンテンツのサブディレクトリ。`photobook/`や`comic/`の中には、さらにサブディレクトリを介して画像やPDFなどのファイルが格納されるケースが多い。(`photobook/`や`comic/`はあくまで例であり、実際のディレクトリ名は任意である)
+  - thumbnail以下は、サムネイル生成物を格納するディレクトリ。`contents/` と同じ相対階層で管理する。
+  - サムネイル出力先は配置ルートは `thumbnail/` とする。そこに原本のコンテンツディレクトリと同一の階層で管理する。pdfやcbzなどの非画像ファイルは、ファイル名の拡張子の"."を"_"に置換したディレクトリを作成し、その中にサムネイル画像を配置する。
+    - 例: `contents/comic/zzz/zzz_vol1.pdf` -> `thumbnail/comic/zzz/zzz_vol1_pdf/`
+    - 例: `contents/photo/alpha/book01/` -> `thumbnail/photo/alpha/book01/`
+  - サムネイル画像のサイズは、長辺 `200px` を基準とする。(縦横比は維持し、短辺は元比率に従う)
+  - サムネイル画像フォルダには`cover.jpg`という名前で表紙用のサムネイル画像を配置する。
+  - サムネイル画像フォルダには連番でサムネイル画像を保存する。例えば、`001.jpg`、`002.jpg` のようにする。
 - `structure.json`は、コンテンツの構成を記述するjsonファイル。
   - `structure.json`の内容は、コンテンツの構成を表すツリー構造になっている。
   - `structure.json`の内容をもとに、ナビゲーションhtmlを生成する。(実際は、jsonデータを静的データとして持つjsファイルに変換することでナビゲーションhtmlを実現するイメージ)

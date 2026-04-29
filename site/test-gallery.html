@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Gallery Media Unit Test</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      max-width: 900px;
+      margin: 0 auto;
+      padding: 24px;
+      background: #f6f8fb;
+      color: #222;
+    }
+    h1 {
+      margin-bottom: 12px;
+    }
+    .note {
+      margin-bottom: 16px;
+      color: #4b5563;
+    }
+    pre {
+      padding: 16px;
+      border-radius: 10px;
+      background: #111827;
+      color: #e5eefc;
+      overflow: auto;
+      white-space: pre-wrap;
+      line-height: 1.5;
+    }
+  </style>
+</head>
+<body data-gallery-page="false">
+  <h1>Gallery Media Unit Test</h1>
+  <p class="note">`gallery.js` の動画対応 helper のテスト結果です。</p>
+  <pre id="results">Loading...</pre>
+
+  <script src="js/gallery.js"></script>
+  <script src="js/test-gallery.js"></script>
+</body>
+</html>

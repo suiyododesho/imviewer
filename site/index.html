@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Photo Gallery Site</title>
+  <link rel="stylesheet" href="css/style.css">
+  <link rel="stylesheet" href="vendor/fontawesome/css/all.min.css">
+</head>
+<body>
+  <!-- Header -->
+  <header class="header">
+    <div class="header-content">
+      <a href="index.html" class="site-title">Photo Gallery</a>
+      <div class="search-box">
+        <input
+          type="text"
+          id="searchInput"
+          placeholder="人物名で検索"
+          aria-label="Search people by name"
+        >
+      </div>
+    </div>
+  </header>
+
+  <!-- Breadcrumbs -->
+  <nav class="breadcrumbs">
+    <div class="breadcrumbs-content breadcrumbs-content-with-controls">
+      <div id="breadcrumbTrail" class="breadcrumb-trail">
+        <span>トップ</span>
+      </div>
+      <div id="viewModeControls" class="view-mode-controls" aria-label="表示モード切替"></div>
+    </div>
+  </nav>
+
+  <!-- Main Content -->
+  <main>
+    <div class="main-content">
+      <div class="page-shell">
+        <aside class="side-panel" aria-label="サイドメニュー">
+          <div class="sidebar-card">
+            <div id="seriesSidebar"></div>
+          </div>
+        </aside>
+
+        <div class="page-main">
+          <!-- Projects Grid (Default View) -->
+          <div id="projectsContainer" class="project-grid">
+            <!-- Populated by JavaScript -->
+          </div>
+
+          <!-- Search Results View (Hidden by default) -->
+          <div id="searchResults" class="hidden">
+            <div id="searchResultsContent">
+              <!-- Populated by JavaScript -->
+            </div>
+          </div>
+
+          <!-- No Results Message -->
+          <div id="noResults" class="no-results hidden">
+            該当する人物がみつかりません
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- Scripts -->
+  <script src="js/structure.js"></script>
+  <script src="js/gallery-pages.js"></script>
+  <script src="js/site-config.js"></script>
+  <script src="js/navigation.js"></script>
+  <script src="js/search.js"></script>
+  <script src="js/series.js"></script>
+  <script src="js/index.js"></script>
+</body>
+</html>

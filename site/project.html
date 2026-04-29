@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Photo Gallery - Project</title>
+  <link rel="stylesheet" href="css/style.css">
+  <link rel="stylesheet" href="vendor/fontawesome/css/all.min.css">
+</head>
+<body>
+  <!-- Header -->
+  <header class="header">
+    <div class="header-content">
+      <a href="index.html" class="site-title">Photo Gallery</a>
+      <div class="search-box">
+        <input
+          type="text"
+          id="searchInput"
+          placeholder="人物名で検索"
+          aria-label="Search people by name"
+        >
+      </div>
+    </div>
+  </header>
+
+  <!-- Breadcrumbs -->
+  <nav class="breadcrumbs">
+    <div class="breadcrumbs-content">
+      <a href="index.html">トップ</a>
+      <span>&gt;</span>
+      <span id="projectName" class="breadcrumb-current">企画</span>
+    </div>
+  </nav>
+
+  <!-- Main Content -->
+  <main>
+    <div class="main-content">
+      <div class="page-shell">
+        <aside class="side-panel" aria-label="サイドメニュー">
+          <div class="sidebar-card">
+            <div id="seriesSidebar"></div>
+          </div>
+        </aside>
+
+        <div class="page-main project-page-main">
+          <!-- Project Banner Section -->
+          <div id="projectBannerSection" class="project-banner-section">
+            <div class="project-banner-large">
+              <!-- Populated by JavaScript -->
+            </div>
+          </div>
+
+          <div class="project-main-layout">
+            <div class="project-main-content">
+              <!-- People and Galleries Groups -->
+              <div id="peopleContainer">
+                <!-- Populated by JavaScript -->
+              </div>
+
+              <!-- No Results Message -->
+              <div id="noResults" class="no-results hidden">
+                コンテンツが見つかりません
+              </div>
+            </div>
+
+            <aside id="projectToc" class="project-toc" aria-label="人物目次" hidden>
+              <!-- Populated by JavaScript -->
+            </aside>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- Scripts -->
+  <script src="js/structure.js"></script>
+  <script src="js/gallery-pages.js"></script>
+  <script src="js/site-config.js"></script>
+  <script src="js/navigation.js"></script>
+  <script src="js/search.js"></script>
+  <script src="js/series.js"></script>
+  <script src="js/project.js"></script>
+</body>
+</html>

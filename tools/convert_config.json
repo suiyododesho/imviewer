@@ -1,0 +1,10 @@
+{
+  "ffmpeg_path": "D:\\Tool\\_cuitool\\ffmpeg-4.4.1\\ffmpeg.exe",
+  "upscale": true,
+  "resolution": "",
+  "frame_rate": "",
+  "bit_rate": "",
+  "quality": 24,
+  "ffmpeg_options": "",
+  "vlc_path": "D:\\Programs\\VLC\\vlc.exe"
+}

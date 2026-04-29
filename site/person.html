@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Photo Gallery - Person</title>
+  <link rel="stylesheet" href="css/style.css">
+  <link rel="stylesheet" href="vendor/fontawesome/css/all.min.css">
+</head>
+<body>
+  <!-- Header -->
+  <header class="header">
+    <div class="header-content">
+      <a href="index.html" class="site-title">Photo Gallery</a>
+      <div class="search-box">
+        <input
+          type="text"
+          id="searchInput"
+          placeholder="人物名で検索"
+          aria-label="Search people by name"
+        >
+      </div>
+    </div>
+  </header>
+
+  <!-- Breadcrumbs -->
+  <nav class="breadcrumbs">
+    <div class="breadcrumbs-content">
+      <a href="index.html">トップ</a>
+      <span>&gt;</span>
+      <a href="#" id="projectLink" class="breadcrumb-project">企画</a>
+      <span>&gt;</span>
+      <span id="personName" class="breadcrumb-current">人物</span>
+    </div>
+  </nav>
+
+  <!-- Main Content -->
+  <main>
+    <div class="main-content">
+      <div class="page-shell">
+        <aside class="side-panel" aria-label="サイドメニュー">
+          <div class="sidebar-card">
+            <div id="seriesSidebar"></div>
+          </div>
+        </aside>
+
+        <div class="page-main">
+          <div id="personExternalLinks" class="external-links external-links-person"></div>
+
+          <!-- Person Gallery Grid -->
+          <div id="galleryContainer" class="gallery-grid">
+            <!-- Populated by JavaScript -->
+          </div>
+
+          <!-- No Results Message -->
+          <div id="noResults" class="no-results hidden">
+            ギャラリーが見つかりません
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- Navigation (Prev/Next) -->
+  <footer class="navigation-footer">
+    <div class="main-content">
+      <div class="navigation">
+        <button id="prevButton" class="nav-button">← 前へ</button>
+        <span id="navInfo" class="nav-info"></span>
+        <button id="nextButton" class="nav-button">次へ →</button>
+      </div>
+    </div>
+  </footer>
+
+  <!-- Scripts -->
+  <script src="js/structure.js"></script>
+  <script src="js/gallery-pages.js"></script>
+  <script src="js/site-config.js"></script>
+  <script src="js/navigation.js"></script>
+  <script src="js/search.js"></script>
+  <script src="js/series.js"></script>
+  <script src="js/person.js"></script>
+</body>
+</html>

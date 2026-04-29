@@ -1,0 +1,307 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>デバッグ情報</title>
+  <style>
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      max-width: 1000px;
+      margin: 0 auto;
+      padding: 20px;
+      background-color: #f5f5f5;
+    }
+    h1 {
+      color: #333;
+      border-bottom: 3px solid #0066cc;
+      padding-bottom: 10px;
+    }
+    h2 {
+      color: #0066cc;
+      margin-top: 30px;
+    }
+    .info-box {
+      background-color: #fff;
+      border-left: 4px solid #0066cc;
+      padding: 15px;
+      margin: 10px 0;
+      border-radius: 4px;
+    }
+    .info-box.error {
+      border-left-color: #f44336;
+      background-color: #ffebee;
+    }
+    .info-box.success {
+      border-left-color: #4caf50;
+      background-color: #e8f5e9;
+    }
+    .info-box.warning {
+      border-left-color: #ff9800;
+      background-color: #fff3e0;
+    }
+    .code {
+      background-color: #f9f9f9;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      padding: 10px;
+      margin: 5px 0;
+      font-family: monospace;
+      font-size: 12px;
+      word-break: break-all;
+      white-space: pre-wrap;
+    }
+    .button-group {
+      margin: 20px 0;
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+    button {
+      padding: 10px 20px;
+      background-color: #0066cc;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 14px;
+    }
+    button:hover {
+      background-color: #0052a3;
+    }
+    #status {
+      margin-top: 20px;
+    }
+  </style>
+</head>
+<body>
+  <h1>🔧 デバッグ & トラブルシューティング</h1>
+  
+  <h2>1. 環境情報</h2>
+  <div class="info-box">
+    <p><strong>ページロケーション:</strong></p>
+    <div class="code" id="location"></div>
+    <p><strong>ブラウザ:</strong></p>
+    <div class="code" id="browser"></div>
+  </div>
+
+  <h2>2. structure.json 診断</h2>
+  <div class="button-group">
+    <button onclick="testStructureJSON()">structure.json の読み込みテスト</button>
+    <button onclick="testFetch()">Fetch API テスト</button>
+  </div>
+  <div id="status"></div>
+
+  <h2>3. よくある問題と解決策</h2>
+  
+  <div class="info-box error">
+    <h3>❌ 問題: "サイトの読み込みに失敗しました"</h3>
+    <p><strong>原因:</strong> structure.json が読み込めない</p>
+    <p><strong>対処法:</strong></p>
+    <ol>
+      <li><strong>file:// で開いている場合:</strong>
+        <ul>
+          <li>ローカルファイルシステムのセキュリティ制限が原因です</li>
+          <li>解決: HTTPサーバーを使用してください（下記参照）</li>
+        </ul>
+      </li>
+      <li><strong>HTTPサーバーを使用している場合:</strong>
+        <ul>
+          <li>ポート 8080 が使用可能か確認</li>
+          <li>対象ディレクトリが site/ か確認</li>
+          <li>structure.json ファイルが site/ に存在してるか確認</li>
+        </ul>
+      </li>
+    </ol>
+  </div>
+
+  <div class="info-box warning">
+    <h3>⚠️ CORS エラーが表示される場合</h3>
+    <p>HTTPサーバーの CORS 設定を確認してください。Python サーバーの場合、デフォルトで CORS は有効です。</p>
+  </div>
+
+  <h2>4. HTTPサーバーの起動方法</h2>
+  
+  <div class="info-box success">
+    <p><strong>方法 1: Python (最も一般的)</strong></p>
+    <div class="code">cd > site
+python -m http.server 8080</div>
+    <p>その後、ブラウザで以下をアクセス:</p>
+    <div class="code">http://localhost:8080/index.html</div>
+  </div>
+
+  <div class="info-box">
+    <p><strong>方法 2: Node.js</strong></p>
+    <div class="code">npx http-server site/ -c-1 -p 8080</div>
+  </div>
+
+  <div class="info-box">
+    <p><strong>方法 3: VS Code Live Server 拡張</strong></p>
+    <div class="code">index.html を右クリック → "Open with Live Server"</div>
+  </div>
+
+  <h2>5. コンソールログを確認</h2>
+  <ol>
+    <li>ブラウザで F12 を押す（開発者ツール）</li>
+    <li>「コンソール」タブを開く</li>
+    <li>赤いエラーメッセージと詳細を確認</li>
+    <li>エラーメッセージを記録</li>
+  </ol>
+
+  <div class="info-box">
+    <p>以下のように表示されるはずです:</p>
+    <div class="code">✓ structure.json 読み込み成功
+✓ プロジェクト数: 4
+✓ 人物数: 12
+✓ ギャラリー数: 48</div>
+  </div>
+
+  <h2>6. ファイル構造確認</h2>
+  <p>site/ ディレクトリに以下が存在することを確認してください:</p>
+  <div class="code">site/
+├── index.html           ✓ 必須
+├── project.html         ✓ 必須
+├── person.html          ✓ 必須
+├── gallery.html         ✓ 必須
+├── structure.json       ✓ 必須（最重要）
+├── css/
+│   └── style.css        ✓ 必須
+├── js/
+│   ├── navigation.js    ✓ 必須
+│   ├── search.js        ✓ 必須
+│   ├── index.js         ✓ 必須
+│   ├── project.js       ✓ 必須
+│   ├── person.js        ✓ 必須
+│   └── gallery.js       ✓ 必須
+├── thumbnail/           ✓ 必須（サムネイル画像）
+├── banner/              ✓ 必須（バナー画像）
+└── contents/            （参考用）</div>
+
+  <h2>7. テスト実行</h2>
+  <p>下記の診断ボタンを実行してください:</p>
+  <div class="button-group">
+    <button onclick="allDiagnostics()">📋 完全診断を実行</button>
+    <button onclick="clearStatus()">クリア</button>
+  </div>
+
+  <script>
+    // Display environment info
+    document.getElementById('location').textContent = window.location.href;
+    document.getElementById('browser').textContent = navigator.userAgent;
+
+    function log(message, type = 'info') {
+      const statusDiv = document.getElementById('status');
+      let className = 'info-box';
+      if (type === 'error') className += ' error';
+      else if (type === 'success') className += ' success';
+      else if (type === 'warning') className += ' warning';
+      
+      const msg = message.includes('\n') ? `<div class="code">${message}</div>` : message;
+      statusDiv.innerHTML += `<div class="${className}">${msg}</div>`;
+    }
+
+    function clearStatus() {
+      document.getElementById('status').innerHTML = '';
+    }
+
+    async function testStructureJSON() {
+      clearStatus();
+      log('structure.json の読み込みをテスト中...', 'info');
+      
+      try {
+        const response = await fetch('structure.json');
+        log(`ステータスコード: ${response.status}`);
+        
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}`);
+        }
+        
+        const structure = await response.json();
+        log('✓ JSON パース成功', 'success');
+        
+        const projects = Object.keys(structure);
+        log(`✓ プロジェクト数: ${projects.length}`);
+        
+        let totalGalleries = 0;
+        for (const project of projects) {
+          const projectData = structure[project];
+          for (const [key, value] of Object.entries(projectData)) {
+            if (key !== 'label' && key !== 'banner' && value.galleries) {
+              totalGalleries += value.galleries.length;
+            }
+          }
+        }
+        
+        log(`✓ ギャラリー総数: ${totalGalleries}`, 'success');
+        log('✓ structure.json は問題ありません', 'success');
+        
+      } catch (error) {
+        log(`✗ エラー: ${error.message}`, 'error');
+        log(`詳細:
+- fetch が構造体を取得できませんでした
+- structure.json のパスを確認してください
+- HTTPサーバーが起動しているか確認してください
+- ファイアウォール設定を確認してください`, 'warning');
+      }
+    }
+
+    async function testFetch() {
+      clearStatus();
+      log('Fetch API テスト中...', 'info');
+      
+      try {
+        const response = await fetch('.');
+        log(`✓ ディレクトリアクセス成功: ${response.status}`);
+        
+        if (response.status === 200) {
+          log('✓ サーバーが正常に応答しています', 'success');
+        }
+      } catch (error) {
+        log(`✗ エラー: ${error.message}`, 'error');
+        log(`原因:
+- HTTPサーバーが起動していない可能性
+- CORS エラーの可能性
+- ネットワーク接続の問題`, 'warning');
+      }
+    }
+
+    async function allDiagnostics() {
+      clearStatus();
+      
+      log('📋 完全診断を開始します...', 'info');
+      log(`環境: ${window.location.protocol}://${window.location.hostname}:${window.location.port || '80'}`);
+      
+      // Test 1: Fetch
+      log('\n[診断 1] Fetch API テスト');
+      try {
+        const response = await fetch('.');
+        log(`✓ Fetch API: ${response.status}`, 'success');
+      } catch (e) {
+        log(`✗ Fetch API: ${e.message}`, 'error');
+      }
+      
+      // Test 2: structure.json
+      log('\n[診断 2] structure.json テスト');
+      await testStructureJSON();
+      
+      // Test 3: HTML files
+      log('\n[診断 3] HTMLファイル確認');
+      const files = ['index.html', 'project.html', 'person.html', 'gallery.html'];
+      for (const file of files) {
+        try {
+          const response = await fetch(file);
+          if (response.ok) {
+            log(`✓ ${file}`, 'success');
+          } else {
+            log(`✗ ${file} (${response.status})`, 'error');
+          }
+        } catch (e) {
+          log(`✗ ${file}: ${e.message}`, 'error');
+        }
+      }
+      
+      log('\n✓ 診断完了', 'success');
+    }
+  </script>
+</body>
+</html>

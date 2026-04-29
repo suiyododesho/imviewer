@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Navigation Test</title>
+  <style>
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      max-width: 1000px;
+      margin: 0 auto;
+      padding: 20px;
+      background-color: #f5f5f5;
+    }
+    h1 {
+      color: #333;
+      border-bottom: 3px solid #0066cc;
+      padding-bottom: 10px;
+    }
+    h2 {
+      color: #0066cc;
+      margin-top: 30px;
+    }
+    .test-result {
+      background-color: #fff;
+      border-left: 4px solid #4caf50;
+      padding: 15px;
+      margin: 10px 0;
+      border-radius: 4px;
+    }
+    .test-result.fail {
+      border-left-color: #f44336;
+      background-color: #ffebee;
+    }
+    .test-result.warn {
+      border-left-color: #ff9800;
+      background-color: #fff3e0;
+    }
+    .test-result.pass {
+      border-left-color: #4caf50;
+      background-color: #e8f5e9;
+    }
+    .status {
+      font-weight: bold;
+      margin-bottom: 10px;
+    }
+    .status.pass {
+      color: #4caf50;
+    }
+    .status.fail {
+      color: #f44336;
+    }
+    .status.warn {
+      color: #ff9800;
+    }
+    .url-example {
+      background-color: #f9f9f9;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      padding: 10px;
+      margin: 5px 0;
+      font-family: monospace;
+      font-size: 12px;
+      word-break: break-all;
+    }
+    .summary {
+      background-color: #e8f5e9;
+      border: 2px solid #4caf50;
+      border-radius: 8px;
+      padding: 20px;
+      margin-top: 30px;
+      text-align: center;
+    }
+    .summary.fail {
+      background-color: #ffebee;
+      border-color: #f44336;
+    }
+    .summary h3 {
+      margin-top: 0;
+    }
+    .button-group {
+      margin: 20px 0;
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+    .test-button {
+      padding: 10px 20px;
+      background-color: #0066cc;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 14px;
+      text-decoration: none;
+      display: inline-block;
+    }
+    .test-button:hover {
+      background-color: #0052a3;
+    }
+    #results {
+      margin-top: 20px;
+    }
+    .loading {
+      text-align: center;
+      color: #999;
+      padding: 20px;
+    }
+  </style>
+</head>
+<body>
+  <h1>📋 ページ遷移テストツール</h1>
+  
+  <p>このツールで、サイトのページ遷移とデータ整合性を検証します。</p>
+
+  <div class="button-group">
+    <button class="test-button" onclick="runAllTests()">すべてのテストを実行</button>
+    <button class="test-button" onclick="testNavigation()">ナビゲーション流れをテスト</button>
+    <button class="test-button" onclick="clearResults()">結果をクリア</button>
+  </div>
+
+  <div id="results"></div>
+
+  <script src="js/test.js"></script>
+  <script>
+    function log(message, type = 'info') {
+      const resultsDiv = document.getElementById('results');
+      const className = type === 'info' ? 'test-result' : `test-result ${type}`;
+      resultsDiv.innerHTML += `<div class="${className}"><div class="status ${type}">${type.toUpperCase()}</div><div>${message}</div></div>`;
+    }
+
+    function clearResults() {
+      document.getElementById('results').innerHTML = '';
+    }
+
+    async function runAllTests() {
+      clearResults();
+      log('테스트 시작...', 'info');
+      
+      // Test 1: structure.json
+      await testStructureJSON();
+      
+      // Test 2: HTML Files
+      await testHTMLFiles();
+      
+      // Test 3: JS Files
+      await testJSFiles();
+      
+      // Test 4: Images
+      await testImages();
+      
+      // Test 5: Navigation
+      await testNavigation();
+    }
+
+    async function testStructureJSON() {
+      try {
+        log('構造体のテスト中...', 'info');
+        const response = await fetch('structure.json');
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        
+        const structure = JSON.parse(await response.text());
+        const projects = Object.keys(structure);
+        
+        let totalGalleries = 0;
+        for (const project of projects) {
+          const projectData = structure[project];
+          for (const [key, value] of Object.entries(projectData)) {
+            if (key !== 'label' && key !== 'banner' && key !== 'series' && value.galleries) {
+              totalGalleries += value.galleries.length;
+            }
+          }
+        }
+        
+        log(`✓ structure.json 読み込み成功<br>プロジェクト: ${projects.length}, コンテンツ総数: ${totalGalleries}`, 'pass');
+      } catch (error) {
+        log(`✗ structure.json エラー: ${error.message}`, 'fail');
+      }
+    }
+
+    async function testHTMLFiles() {
+      log('HTMLファイルの確認中...', 'info');
+      const files = ['index.html', 'project.html', 'person.html', 'gallery.html'];
+      let passed = 0;
+      
+      for (const file of files) {
+        try {
+          const response = await fetch(file);
+          if (response.ok) {
+            passed++;
+            log(`✓ ${file}`, 'pass');
+          } else {
+            log(`✗ ${file} (HTTP ${response.status})`, 'fail');
+          }
+        } catch (error) {
+          log(`✗ ${file} (${error.message})`, 'fail');
+        }
+      }
+    }
+
+    async function testJSFiles() {
+      log('JavaScriptファイルの確認中...', 'info');
+      const files = ['site-config.js', 'series.js', 'navigation.js', 'search.js', 'index.js', 'project.js', 'person.js', 'gallery.js'];
+      let passed = 0;
+      
+      for (const file of files) {
+        try {
+          const response = await fetch(`js/${file}`);
+          if (response.ok) {
+            passed++;
+            log(`✓ js/${file}`, 'pass');
+          } else {
+            log(`✗ js/${file}`, 'fail');
+          }
+        } catch (error) {
+          log(`✗ js/${file}`, 'fail');
+        }
+      }
+    }
+
+    async function testImages() {
+      log('画像ファイルの確認中...', 'info');
+      const folders = ['thumbnail', 'banner'];
+      
+      for (const folder of folders) {
+        try {
+          const response = await fetch(folder);
+          log(`${folder}/ フォルダが存在します`, 'pass');
+        } catch (error) {
+          log(`${folder}/ フォルダにアクセスできません (これは正常です)`, 'warn');
+        }
+      }
+    }
+
+    async function testNavigation() {
+      clearResults();
+      log('ナビゲーションフローテスト', 'info');
+      
+      try {
+        const structure = await (await fetch('structure.json')).json();
+        const firstProject = Object.keys(structure)[0];
+        const projectData = structure[firstProject];
+        
+        let firstPerson = null;
+        for (const [key, value] of Object.entries(projectData)) {
+          if (key !== 'label' && key !== 'banner' && value.galleries) {
+            firstPerson = { key, data: value };
+            break;
+          }
+        }
+        
+        if (!firstPerson) throw new Error('Person data not found');
+        
+        // Test URLs
+        const projectUrl = `project.html?project=${encodeURIComponent(firstProject)}`;
+        const personUrl = `person.html?project=${encodeURIComponent(firstProject)}&person=${encodeURIComponent(firstPerson.key)}`;
+        const galleryUrl = `gallery.html?project=${encodeURIComponent(firstProject)}&person=${encodeURIComponent(firstPerson.key)}&gallery=${encodeURIComponent(firstPerson.data.galleries[0].path)}`;
+        
+        log(`
+          <strong>推奨されるナビゲーションフロー:</strong><br><br>
+          1. <a href="index.html" target="_blank">index.html</a> を開く<br>
+          2. 企画バナーをクリック → <a href="${projectUrl}" target="_blank">project.html</a><br>
+          3. 人物見出しをクリック → <a href="${personUrl}" target="_blank">person.html</a><br>
+          4. ギャラリーをクリック → <a href="${galleryUrl}" target="_blank">gallery.html</a>
+        `, 'pass');
+        
+        log(`<strong>テストサンプルURL:</strong><div class="url-example">${galleryUrl}</div>`, 'info');
+        
+      } catch (error) {
+        log(`ナビゲーションテスト エラー: ${error.message}`, 'fail');
+      }
+    }
+
+    // Auto-run tests on load
+    window.addEventListener('load', () => {
+      log('ページ読み込み完了。"すべてのテストを実行" をクリックしてください。', 'info');
+    });
+  </script>
+</body>
+</html>

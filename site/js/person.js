@@ -168,7 +168,10 @@ function createGalleryMeta(gallery) {
 function getGalleryMediaCounts(gallery) {
   const key = normalizeGalleryPath(gallery?.path || '');
   const map = window.galleryPagesMap || {};
-  const entries = Array.isArray(map[key]) ? map[key] : [];
+  const resolver = typeof window.resolveGalleryPageEntries === 'function'
+    ? window.resolveGalleryPageEntries
+    : (value, _fallbackHtml) => (Array.isArray(value) ? value : []);
+  const entries = resolver(map[key], `contents/${key}`);
 
   if (entries.length === 0) {
     return {

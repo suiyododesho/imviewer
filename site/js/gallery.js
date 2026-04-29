@@ -176,9 +176,14 @@ function buildGalleryPages(galleryPath, galleryData) {
   const map = window.galleryPagesMap || {};
   const key = normalizePath(galleryPath);
   const fromMap = map[key];
+  const resolver = typeof window.resolveGalleryPageEntries === 'function'
+    ? window.resolveGalleryPageEntries
+    : (value) => (Array.isArray(value) ? value : []);
 
-  if (Array.isArray(fromMap) && fromMap.length > 0) {
-    return fromMap
+  const resolvedPages = resolver(fromMap, `contents/${key}`);
+
+  if (resolvedPages.length > 0) {
+    return resolvedPages
       .map((entry) => normalizeGalleryPageEntry(entry, galleryPath))
       .filter((entry) => entry && (entry.image || entry.video));
   }

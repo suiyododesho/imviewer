@@ -4,6 +4,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
+from tools.history_manager import HistoryData
 from tools import maint_build_structure
 from tools import maint_build_gallery_pages
 from tools import maint_structure_lib
@@ -199,6 +200,110 @@ class MaintBuildStructureTests(unittest.TestCase):
                 entries = maint_structure_lib.generate_contents_entries("comic/series-b")
 
         self.assertEqual([item["path"] for item in entries], ["comic/series-b/book02_cbz"])
+
+    def test_gather_media_from_gallery_tree_sorts_by_filename(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            contents_dir = Path(tmp) / "contents"
+            gallery_dir = contents_dir / "photo" / "alpha" / "book01"
+            gallery_dir.mkdir(parents=True)
+            (gallery_dir / "002.jpg").write_bytes(b"jpeg")
+            (gallery_dir / "001.jpg").write_bytes(b"jpeg")
+            (gallery_dir / "000_cover.jpg").write_bytes(b"jpeg")
+
+            with patch.object(maint_build_gallery_pages, "CONTENTS_DIR", str(contents_dir)):
+                pages = maint_build_gallery_pages.gather_media_from_gallery_tree("photo/alpha/book01")
+
+        self.assertEqual(
+            [Path(page["image"]).name for page in pages if page.get("type") == "image"],
+            ["000_cover.jpg", "001.jpg", "002.jpg"],
+        )
+
+    def test_build_gallery_pages_map_diff_detects_renamed_files_without_history(self):
+        structure = {
+            "contents-root": "contents",
+            "genres": {
+                "photo": {
+                    "name": "写真集",
+                    "path": "photo",
+                    "00001": {
+                        "path": "photo/alpha",
+                        "name": "Alpha",
+                        "series": "Alpha",
+                        "main-person": "",
+                        "persons": [],
+                        "labels": [],
+                        "note": "",
+                        "contents": [
+                            {"path": "photo/alpha/book01", "cover": "", "name": "book01", "note": ""}
+                        ],
+                        "exturl": [],
+                    }
+                }
+            }
+        }
+
+        old_pages = [
+            {
+                "type": "image",
+                "image": "contents/photo/alpha/book01/001.jpg",
+                "thumbnail": "thumbnail/photo/alpha/book01/001.jpg",
+                "html": "contents/photo/alpha/book01",
+            },
+            {
+                "type": "image",
+                "image": "contents/photo/alpha/book01/002.jpg",
+                "thumbnail": "thumbnail/photo/alpha/book01/002.jpg",
+                "html": "contents/photo/alpha/book01",
+            },
+        ]
+        existing_map = {
+            "photo/alpha/book01": maint_build_gallery_pages.compact_gallery_pages("photo/alpha/book01", old_pages)
+        }
+
+        with tempfile.TemporaryDirectory() as tmp:
+            site_dir = Path(tmp)
+            contents_dir = site_dir / "contents"
+            gallery_dir = contents_dir / "photo" / "alpha" / "book01"
+            gallery_dir.mkdir(parents=True)
+            (gallery_dir / "000_cover.jpg").write_bytes(b"jpeg")
+            (gallery_dir / "002.jpg").write_bytes(b"jpeg")
+
+            with (
+                patch.object(maint_build_gallery_pages, "CONTENTS_DIR", str(contents_dir)),
+                patch.object(maint_build_gallery_pages, "SITE_DIR", str(site_dir)),
+                patch.object(maint_structure_lib, "CONTENTS_DIR", str(contents_dir)),
+                patch.object(maint_build_gallery_pages, "load_existing_gallery_pages_map", return_value=existing_map),
+                patch.object(maint_build_gallery_pages, "parse_history", return_value=HistoryData()),
+            ):
+                result, metadata = maint_build_gallery_pages.build_gallery_pages_map(structure, diff=True)
+
+        self.assertTrue(metadata["incremental_mode"])
+        self.assertEqual(result["photo/alpha/book01"]["p"][0][:2], ["i", "000_cover.jpg"])
+
+    def test_compact_gallery_pages_strips_repeated_prefixes(self):
+        pages = [
+            {
+                "type": "image",
+                "image": "contents/photo/alpha/book01/001.jpg",
+                "thumbnail": "thumbnail/photo/alpha/book01/001.jpg",
+                "html": "contents/photo/alpha/book01",
+            },
+            {
+                "type": "video",
+                "video": "contents/photo/alpha/book01/clip.mp4",
+                "html": "contents/photo/alpha/book01",
+                "thumbNumber": 1,
+                "label": "clip",
+                "ext": "mp4",
+            },
+        ]
+
+        compact = maint_build_gallery_pages.compact_gallery_pages("photo/alpha/book01", pages)
+
+        self.assertEqual(compact["b"], "contents/photo/alpha/book01")
+        self.assertEqual(compact["t"], "thumbnail/photo/alpha/book01")
+        self.assertEqual(compact["p"][0], ["i", "001.jpg"])
+        self.assertEqual(compact["p"][1], ["v", "clip.mp4", 1, "clip", "mp4"])
 
 
 if __name__ == "__main__":

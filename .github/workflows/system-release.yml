@@ -1,0 +1,242 @@
+name: System Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      major:
+        description: 'Major version bump (x+1.0). Default: minor bump (x.y+1)'
+        type: boolean
+        default: false
+      dry_run:
+        description: 'Dry run – preview tag/zip only, no files changed or uploaded'
+        type: boolean
+        default: false
+      overwrite:
+        description: 'Overwrite existing release asset if same name already exists'
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: windows-latest
+
+    steps:
+      # -----------------------------------------------------------------------
+      # 1. Checkout (full history + all tags so release.py can verify uniqueness)
+      # -----------------------------------------------------------------------
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      # -----------------------------------------------------------------------
+      # 2. Python setup
+      # -----------------------------------------------------------------------
+      - name: Set up Python 3.13
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+
+      - name: Install Python dependencies
+        shell: pwsh
+        run: |
+          Write-Host "=== Installing Python dependencies ==="
+          python -m pip install --upgrade pip
+          pip install pillow pymupdf cx_Freeze
+          Write-Host "=== Dependency installation complete ==="
+
+      # -----------------------------------------------------------------------
+      # 3. Git identity (needed to commit version_sys.txt)
+      # -----------------------------------------------------------------------
+      - name: Configure Git identity
+        shell: pwsh
+        run: |
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git config user.name "github-actions[bot]"
+          Write-Host "Git identity configured."
+
+      # -----------------------------------------------------------------------
+      # 4. Run system release script
+      #    - Builds tools/bin via cx_Freeze
+      #    - Writes site/version_sys.txt
+      #    - Creates releases/xcity-photobook_{tag}_{date}.zip
+      #    - Creates local git tag release_ver_{version}
+      # -----------------------------------------------------------------------
+      - name: Run system release script
+        id: run_release
+        shell: pwsh
+        run: |
+          $release_args = @("tools/release.py", "system")
+          if ("${{ inputs.major }}"   -eq "true") { $release_args += "--major"    }
+          if ("${{ inputs.dry_run }}" -eq "true") { $release_args += "--dry-run"  }
+
+          Write-Host "=== Executing: python $($release_args -join ' ') ==="
+          python @release_args
+          $rc = $LASTEXITCODE
+          if ($rc -ne 0) {
+            Write-Error "release.py failed with exit code $rc"
+            exit $rc
+          }
+          Write-Host "=== release.py finished successfully ==="
+
+      # -----------------------------------------------------------------------
+      # 5. Detect generated tag name and zip path from version_sys.txt
+      #    (skipped in dry-run mode)
+      # -----------------------------------------------------------------------
+      - name: Detect tag and zip
+        if: ${{ !inputs.dry_run }}
+        id: release_info
+        shell: pwsh
+        run: |
+          $sys_ver = (Get-Content "site\version_sys.txt" -Raw).Trim()
+          $tag_name = "release_ver_$sys_ver"
+
+          Write-Host "System version : $sys_ver"
+          Write-Host "Tag name       : $tag_name"
+
+          $zip_files = @(Get-ChildItem "releases\xcity-photobook_${tag_name}_*.zip" -ErrorAction SilentlyContinue)
+          if ($zip_files.Count -eq 0) {
+            Write-Error "ERROR: No zip file found matching releases\xcity-photobook_${tag_name}_*.zip"
+            exit 1
+          }
+          $zip_path = $zip_files[0].FullName
+          $zip_name = $zip_files[0].Name
+
+          Write-Host "Zip file       : $zip_path"
+          Write-Host "Zip name       : $zip_name"
+
+          "tag_name=$tag_name" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+          "zip_path=$zip_path" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+          "zip_name=$zip_name" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+
+      # -----------------------------------------------------------------------
+      # 6. Commit version_sys.txt change
+      # -----------------------------------------------------------------------
+      - name: Commit version_sys.txt
+        if: ${{ !inputs.dry_run }}
+        shell: pwsh
+        run: |
+          $tag = "${{ steps.release_info.outputs.tag_name }}"
+          Write-Host "Staging site/version_sys.txt for tag: $tag"
+          git add site/version_sys.txt
+          git status
+
+          # Only commit if there is actually a staged change
+          git diff --cached --quiet
+          if ($LASTEXITCODE -eq 0) {
+            Write-Host "No changes staged for version_sys.txt – skipping commit."
+          } else {
+            git commit -m "chore: bump system version [$tag]"
+            if ($LASTEXITCODE -ne 0) {
+              Write-Error "git commit failed"
+              exit $LASTEXITCODE
+            }
+            Write-Host "Committed version_sys.txt (tag: $tag)"
+          }
+
+      # -----------------------------------------------------------------------
+      # 7. Push commit and git tag to remote
+      # -----------------------------------------------------------------------
+      - name: Push commit and tag
+        if: ${{ !inputs.dry_run }}
+        shell: pwsh
+        run: |
+          $tag = "${{ steps.release_info.outputs.tag_name }}"
+
+          Write-Host "Pushing commit to origin HEAD..."
+          git push origin HEAD
+          if ($LASTEXITCODE -ne 0) {
+            Write-Error "git push (commit) failed with exit code $LASTEXITCODE"
+            exit $LASTEXITCODE
+          }
+
+          Write-Host "Pushing tag: $tag"
+          git push origin $tag
+          if ($LASTEXITCODE -ne 0) {
+            Write-Error "git push tag '$tag' failed with exit code $LASTEXITCODE"
+            exit $LASTEXITCODE
+          }
+
+          Write-Host "=== Push complete: commit and tag '$tag' ==="
+
+      # -----------------------------------------------------------------------
+      # 8. Create GitHub Release (if it does not already exist)
+      # -----------------------------------------------------------------------
+      - name: Create GitHub Release
+        if: ${{ !inputs.dry_run }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: pwsh
+        run: |
+          $tag = "${{ steps.release_info.outputs.tag_name }}"
+          Write-Host "Checking for existing GitHub Release: $tag"
+
+          gh release view $tag 2>&1 | Out-Null
+          if ($LASTEXITCODE -eq 0) {
+            Write-Host "GitHub Release already exists for tag: $tag"
+          } else {
+            Write-Host "GitHub Release not found – creating..."
+            gh release create $tag `
+              --title "$tag" `
+              --notes "System release $tag (generated by GitHub Actions)"
+            if ($LASTEXITCODE -ne 0) {
+              Write-Error "Failed to create GitHub Release for tag: $tag"
+              exit $LASTEXITCODE
+            }
+            Write-Host "GitHub Release created: $tag"
+          }
+
+      # -----------------------------------------------------------------------
+      # 9. Upload zip asset to GitHub Release
+      #    - overwrite=false: skip if same asset name already exists
+      #    - overwrite=true : use --clobber to replace the existing asset
+      # -----------------------------------------------------------------------
+      - name: Upload zip asset
+        if: ${{ !inputs.dry_run }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: pwsh
+        run: |
+          $tag      = "${{ steps.release_info.outputs.tag_name }}"
+          $zip_path = "${{ steps.release_info.outputs.zip_path }}"
+          $zip_name = "${{ steps.release_info.outputs.zip_name }}"
+          $overwrite = "${{ inputs.overwrite }}"
+
+          Write-Host "=== Asset Upload ==="
+          Write-Host "Tag       : $tag"
+          Write-Host "Zip name  : $zip_name"
+          Write-Host "Zip path  : $zip_path"
+          Write-Host "Overwrite : $overwrite"
+
+          # --- Check if the asset already exists ---
+          $asset_json = gh release view $tag --json assets 2>&1
+          if ($LASTEXITCODE -eq 0) {
+            $asset_names = ($asset_json | ConvertFrom-Json).assets | ForEach-Object { $_.name }
+            if ($asset_names -contains $zip_name) {
+              if ($overwrite -eq "true") {
+                Write-Host "Asset '$zip_name' already exists – deleting for overwrite..."
+                gh release delete-asset $tag $zip_name --yes
+                if ($LASTEXITCODE -ne 0) {
+                  Write-Error "Failed to delete existing asset: $zip_name"
+                  exit $LASTEXITCODE
+                }
+                Write-Host "Existing asset deleted."
+              } else {
+                Write-Host "Asset '$zip_name' already exists – skipping upload (overwrite=false)."
+                exit 0
+              }
+            }
+          }
+
+          # --- Upload ---
+          Write-Host "Uploading '$zip_name' to release '$tag'..."
+          gh release upload $tag $zip_path
+          if ($LASTEXITCODE -ne 0) {
+            Write-Error "Upload failed for asset: $zip_name (release: $tag)"
+            exit $LASTEXITCODE
+          }
+          Write-Host "=== Upload complete: $zip_name -> release $tag ==="

@@ -9,6 +9,15 @@ window.siteStructure = {
     "comic": {
       "name": "漫画",
       "path": "comic",
+      "class": [
+        "main-person"
+      ],
+      "classname": [
+        "著者"
+      ],
+      "browse": {
+        "leafType": "series"
+      },
       "それは霊のしわざです": {
         "path": "comic/[Noise] それは霊のしわざです",
         "name": "それは霊のしわざです",
@@ -67,6 +76,15 @@ window.siteStructure = {
     "photo": {
       "name": "写真集",
       "path": "photo",
+      "class": [
+        "main-person"
+      ],
+      "classname": [
+        "モデル"
+      ],
+      "browse": {
+        "leafType": "content"
+      },
       "[うんぱい] uP": {
         "path": "photo/[うんぱい][20220628] uP",
         "name": "uP",

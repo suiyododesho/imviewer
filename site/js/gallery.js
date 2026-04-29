@@ -634,7 +634,19 @@ function updateBreadcrumbs() {
   const breadcrumb = document.querySelector('.breadcrumbs-content');
   const genreName = Series.getGenreName(siteStructure, currentGenre);
   const seriesName = currentSeriesData ? (currentSeriesData.name || currentSeriesKey) : currentSeriesKey;
-  const contentName = currentGallery ? (currentGallery.name || currentGallery.path || '') : (currentContentPath || '');
+  
+  // structure.jsonからコンテンツを検索してnameを取得
+  let contentName = '';
+  if (currentSeriesData && currentSeriesData.contents) {
+    const content = currentSeriesData.contents.find(c => normalizePath(c.path) === normalizePath(currentContentPath));
+    if (content && content.name) {
+      contentName = content.name;
+    }
+  }
+  // フォールバック
+  if (!contentName) {
+    contentName = currentGallery ? (currentGallery.name || currentGallery.path || '') : (currentContentPath || '');
+  }
 
   Navigation.renderBreadcrumbs(breadcrumb, [
     { label: 'トップ', href: 'index.html' },

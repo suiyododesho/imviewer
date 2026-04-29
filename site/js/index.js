@@ -84,51 +84,47 @@ function renderSeriesList() {
 }
 
 function createSeriesCard(genreKey, seriesKey, data) {
-  const block = document.createElement('div');
-  block.className = 'project-block';
+  const link = document.createElement('a');
+  link.className = 'series-card-item';
+  link.href = Series.buildSeriesHref(genreKey, seriesKey);
 
   const thumbDiv = document.createElement('div');
-  thumbDiv.className = 'project-banner';
+  thumbDiv.className = 'series-card-thumb';
   const cover = Series.getFirstContentCover(data);
   if (cover) {
     const img = document.createElement('img');
     img.src = cover;
     img.alt = data.name || seriesKey;
     img.loading = 'lazy';
-    img.onerror = () => { img.style.display = 'none'; thumbDiv.appendChild(makePlaceholder(data.name || seriesKey)); };
+    img.onerror = () => { img.style.display = 'none'; thumbDiv.innerHTML = '<div class="series-card-placeholder">No image</div>'; };
     thumbDiv.appendChild(img);
   } else {
-    thumbDiv.appendChild(makePlaceholder(data.name || seriesKey));
+    thumbDiv.innerHTML = '<div class="series-card-placeholder">No image</div>';
   }
-  thumbDiv.style.cursor = 'pointer';
-  thumbDiv.addEventListener('click', () => navigateToSeries(genreKey, seriesKey));
-  block.appendChild(thumbDiv);
 
-  const infoDiv = document.createElement('div');
-  infoDiv.className = 'project-info';
+  const info = document.createElement('div');
+  info.className = 'series-card-info';
 
-  const nameEl = document.createElement('div');
-  nameEl.className = 'project-name';
-  nameEl.textContent = data.name || seriesKey;
-  nameEl.style.cursor = 'pointer';
-  nameEl.addEventListener('click', () => navigateToSeries(genreKey, seriesKey));
-  infoDiv.appendChild(nameEl);
+  const titleDiv = document.createElement('div');
+  titleDiv.className = 'series-card-title';
+  titleDiv.textContent = data.name || seriesKey;
 
+  const mainPersonDiv = document.createElement('div');
+  mainPersonDiv.className = 'series-card-line';
   const mainPerson = Series.getMainPerson(data);
-  if (mainPerson) {
-    const personEl = document.createElement('div');
-    personEl.className = 'project-person';
-    personEl.textContent = mainPerson;
-    infoDiv.appendChild(personEl);
-  }
+  mainPersonDiv.textContent = '人物: ' + (mainPerson || 'なし');
 
-  const countEl = document.createElement('div');
-  countEl.className = 'project-count';
-  countEl.textContent = 'コンテンツ: ' + Series.getContentCount(data) + '件';
-  infoDiv.appendChild(countEl);
+  const countDiv = document.createElement('div');
+  countDiv.className = 'series-card-line';
+  countDiv.textContent = 'コンテンツ: ' + Series.getContentCount(data) + '件';
 
-  block.appendChild(infoDiv);
-  return block;
+  info.appendChild(titleDiv);
+  info.appendChild(mainPersonDiv);
+  info.appendChild(countDiv);
+
+  link.appendChild(thumbDiv);
+  link.appendChild(info);
+  return link;
 }
 
 function createSimpleSeriesItem(genreKey, seriesKey, data) {

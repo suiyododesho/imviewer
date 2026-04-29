@@ -369,6 +369,75 @@ main {
   min-height: 118px;
 }
 
+.project-grid .series-card-item {
+  display: grid;
+  grid-template-columns: 116px minmax(0, 1fr);
+  max-width: 100%;
+  min-height: 118px;
+  text-decoration: none;
+  color: inherit;
+  border: 1px solid #e0e0e0;
+  border-radius: 4px;
+  overflow: hidden;
+  background-color: #fff;
+  transition: box-shadow 0.2s;
+}
+
+.project-grid .series-card-item:hover {
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+.project-grid .series-card-thumb {
+  width: 100%;
+  aspect-ratio: auto;
+  height: 100%;
+  min-height: 116px;
+  padding: 6px;
+  border-right: 1px solid #f0f0f0;
+  background-color: #f7f7f7;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.project-grid .series-card-thumb img {
+  width: auto;
+  height: auto;
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+}
+
+.series-card-placeholder {
+  font-size: 12px;
+  color: #ccc;
+  text-align: center;
+}
+
+.series-card-info {
+  padding: 9px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  justify-content: center;
+  min-width: 0;
+}
+
+.series-card-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: #1b2430;
+  line-height: 1.35;
+  word-break: break-word;
+}
+
+.series-card-line {
+  font-size: 12px;
+  line-height: 1.35;
+  color: #5b6673;
+}
+
 .project-grid .project-content-thumb {
   width: 100%;
   aspect-ratio: auto;

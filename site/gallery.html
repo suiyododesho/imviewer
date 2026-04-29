@@ -200,26 +200,33 @@
       flex-direction: row;
       align-items: stretch;
       justify-content: center;
-      gap: 10px;
+      gap: 0;
     }
 
     .media-stage-pane {
       flex: 1;
       min-width: 0;
       min-height: 0;
-      border: 1px solid #2b2b2b;
-      border-radius: 4px;
-      background: #101010;
+      border: none;
+      border-radius: 0;
+      background: transparent;
       display: flex;
       align-items: center;
       justify-content: center;
       overflow: hidden;
-      padding: 6px;
+      padding: 0;
+    }
+
+    .media-stage-pane.is-spread-left {
+      justify-content: flex-end;
+    }
+
+    .media-stage-pane.is-spread-right {
+      justify-content: flex-start;
     }
 
     .media-stage-pane.is-empty {
-      background: #0d0d0d;
-      border-color: #1d1d1d;
+      background: transparent;
     }
 
     .media-stage-pane img,

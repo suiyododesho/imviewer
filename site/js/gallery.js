@@ -88,7 +88,8 @@ const swipeNavState = {
 };
 
 const STAGE_THUMBNAIL_SIZE = 176;
-const GALLERY_VIEW_MODE_STORAGE_KEY = 'imviewer.gallery.viewMode';
+const GALLERY_VIEW_MODE_STORAGE_KEY_PREFIX = 'imviewer.gallery.viewMode';
+const GALLERY_VIEW_MODE_LEGACY_STORAGE_KEY = 'imviewer.gallery.viewMode';
 
 const GALLERY_VIEW_MODES = [
   { key: 'single', label: '単一ページ表示' },
@@ -712,8 +713,9 @@ function renderStageContent(stage, spreadInfo) {
   const wrapper = document.createElement('div');
   wrapper.className = 'media-stage-content media-stage-root is-spread';
 
-  spreadInfo.unit.slots.forEach((pageIndex) => {
-    wrapper.appendChild(createSpreadPane(pageIndex));
+  spreadInfo.unit.slots.forEach((pageIndex, slotIndex) => {
+    const side = slotIndex === 0 ? 'left' : 'right';
+    wrapper.appendChild(createSpreadPane(pageIndex, side));
   });
 
   stage.prepend(wrapper);
@@ -795,9 +797,14 @@ function renderSingleStageContent(stage, page) {
   setZoomMedia(img);
 }
 
-function createSpreadPane(pageIndex) {
+function createSpreadPane(pageIndex, side) {
   const pane = document.createElement('div');
   pane.className = 'media-stage-pane';
+  if (side === 'left') {
+    pane.classList.add('is-spread-left');
+  } else if (side === 'right') {
+    pane.classList.add('is-spread-right');
+  }
 
   if (!Number.isInteger(pageIndex) || !galleryPages[pageIndex]) {
     pane.classList.add('is-empty');
@@ -1932,7 +1939,15 @@ function applyGalleryViewMode(mode, persist) {
 
 function loadGalleryViewMode() {
   try {
-    return normalizeGalleryViewMode(window.localStorage.getItem(GALLERY_VIEW_MODE_STORAGE_KEY));
+    const perContentKey = getGalleryViewModeStorageKey();
+    const stored = window.localStorage.getItem(perContentKey);
+    if (stored !== null) {
+      return normalizeGalleryViewMode(stored);
+    }
+
+    // Backward compatibility: previously this setting was global.
+    const legacy = window.localStorage.getItem(GALLERY_VIEW_MODE_LEGACY_STORAGE_KEY);
+    return normalizeGalleryViewMode(legacy);
   } catch (error) {
     console.debug('Failed to load gallery view mode:', error);
     return 'single';
@@ -1941,10 +1956,19 @@ function loadGalleryViewMode() {
 
 function persistGalleryViewMode(mode) {
   try {
-    window.localStorage.setItem(GALLERY_VIEW_MODE_STORAGE_KEY, normalizeGalleryViewMode(mode));
+    const key = getGalleryViewModeStorageKey();
+    window.localStorage.setItem(key, normalizeGalleryViewMode(mode));
   } catch (error) {
     console.debug('Failed to persist gallery view mode:', error);
   }
+}
+
+function getGalleryViewModeStorageKey() {
+  const contentPath = normalizePath(currentContentPath || currentGallery?.path || '');
+  if (!contentPath) {
+    return GALLERY_VIEW_MODE_STORAGE_KEY_PREFIX;
+  }
+  return `${GALLERY_VIEW_MODE_STORAGE_KEY_PREFIX}:${contentPath}`;
 }
 
 // ============ Navigation ============

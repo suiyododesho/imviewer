@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import os
 import re
@@ -126,36 +127,41 @@ def gather_media_from_gallery_tree(start_rel):
         return []
 
     gallery_root_abs = page_abs if os.path.isdir(page_abs) else os.path.dirname(page_abs)
-    image_pages = []
-    video_pages = []
-    video_index = 0
+    media_pages = []
 
     for root, dirs, files in os.walk(gallery_root_abs):
         dirs[:] = sorted(
             [d for d in dirs if not (d.lower() == 'thumbnail' and os.path.basename(root).lower() == 'src')],
             key=str.lower,
         )
-        for name in files:
+        for name in sorted(files, key=str.lower):
             lower_name = name.lower()
             file_abs = os.path.join(root, name)
             file_rel = norm_rel(os.path.relpath(file_abs, CONTENTS_DIR))
             if lower_name.endswith(IMAGE_EXTENSIONS):
-                image_pages.append({
+                media_pages.append({
                     'type': 'image',
                     'image': f"contents/{file_rel}",
                     'html': f"contents/{start_rel}",
                 })
             elif lower_name.endswith(VIDEO_EXTENSIONS):
-                video_index += 1
-                video_pages.append({
+                media_pages.append({
                     'type': 'video',
                     'video': f"contents/{file_rel}",
                     'html': f"contents/{start_rel}",
-                    'thumbNumber': video_index,
                     'label': os.path.splitext(name)[0],
                     'ext': os.path.splitext(name)[1].lstrip('.').lower(),
                 })
-    return image_pages + video_pages
+
+    video_index = 0
+    pages = []
+    for page in media_pages:
+        if page.get('type') == 'video':
+            video_index += 1
+            page['thumbNumber'] = video_index
+        pages.append(page)
+
+    return pages
 
 
 def dedupe_pages(pages):
@@ -201,6 +207,108 @@ def _get_gallery_thumbnail_dir_rel(gallery_path):
     if ext in ('.html', '.htm'):
         return f'thumbnail/{os.path.dirname(normalized)}'
     return f'thumbnail/{normalized}'
+
+
+def _get_gallery_media_base_uri(gallery_path):
+    normalized = norm_rel(gallery_path).rstrip('/')
+    ext = os.path.splitext(normalized)[1].lower()
+    if ext in ('.html', '.htm'):
+        normalized = os.path.dirname(normalized)
+    return f'contents/{normalized}' if normalized else 'contents'
+
+
+def _strip_base_prefix(value, base):
+    normalized_value = norm_rel(value)
+    normalized_base = norm_rel(base).rstrip('/')
+    if not normalized_base:
+        return normalized_value
+    prefix = normalized_base + '/'
+    if normalized_value.startswith(prefix):
+        return normalized_value[len(prefix):]
+    return normalized_value
+
+
+def compact_gallery_pages(gallery_path, pages):
+    media_base = _get_gallery_media_base_uri(gallery_path)
+    thumb_base = _get_gallery_thumbnail_dir_rel(gallery_path)
+    compact_pages = []
+
+    for page in pages:
+        page_type = page.get('type') or ('video' if page.get('video') else 'image')
+        if page_type == 'video':
+            item = [
+                'v',
+                _strip_base_prefix(page.get('video', ''), media_base),
+                page.get('thumbNumber') or None,
+                page.get('label') or '',
+                (page.get('ext') or '').lower(),
+            ]
+        else:
+            item = [
+                'i',
+                _strip_base_prefix(page.get('image', ''), media_base),
+            ]
+            thumbnail = page.get('thumbnail', '')
+            if thumbnail:
+                relative_thumb = _strip_base_prefix(thumbnail, thumb_base or media_base)
+                if relative_thumb != item[1] or not thumb_base:
+                    item.append(relative_thumb)
+
+        while len(item) > 2 and item[-1] in ('', None):
+            item.pop()
+        compact_pages.append(item)
+
+    compact = {'b': media_base, 'p': compact_pages, 's': build_gallery_signature(gallery_path, pages)}
+    if thumb_base:
+        compact['t'] = thumb_base
+    return compact
+
+
+def build_gallery_signature(gallery_path, pages):
+    media_base = _get_gallery_media_base_uri(gallery_path)
+    signature_items = []
+    for page in pages:
+        page_type = page.get('type') or ('video' if page.get('video') else 'image')
+        raw_uri = page.get('video', '') if page_type == 'video' else page.get('image', '')
+        rel_name = _strip_base_prefix(raw_uri, media_base)
+        try:
+            file_size = os.path.getsize(media_uri_to_abs(raw_uri))
+        except OSError:
+            file_size = -1
+        prefix = 'v' if page_type == 'video' else 'i'
+        signature_items.append([prefix, rel_name, file_size])
+    payload = json.dumps(signature_items, ensure_ascii=False, separators=(',', ':')).encode('utf-8')
+    return hashlib.sha1(payload).hexdigest()
+
+
+def get_entry_signature(entry):
+    if isinstance(entry, dict):
+        value = entry.get('s')
+        if isinstance(value, str) and value:
+            return value
+    return None
+
+
+def detect_changed_gallery_paths(gallery_paths, existing_map):
+    changed = []
+    existing_map = existing_map if isinstance(existing_map, dict) else {}
+    for gallery_path in gallery_paths:
+        source_gallery_path = resolve_gallery_source_path(gallery_path)
+        pages = collect_gallery_pages_for_path(source_gallery_path)
+        current_signature = build_gallery_signature(source_gallery_path, pages)
+        if current_signature != get_entry_signature(existing_map.get(gallery_path)):
+            changed.append(gallery_path)
+    return changed
+
+
+def count_gallery_pages_entry(entry):
+    if isinstance(entry, list):
+        return len(entry)
+    if isinstance(entry, dict):
+        pages = entry.get('p')
+        if isinstance(pages, list):
+            return len(pages)
+    return 0
 
 
 def ensure_gallery_prebuilt_thumbnails(gallery_path, pages):
@@ -282,6 +390,16 @@ def resolve_gallery_source_path(gallery_path: str) -> str:
     return normalized
 
 
+def collect_gallery_pages_for_path(source_gallery_path: str) -> list[dict]:
+    gallery_abs = os.path.join(CONTENTS_DIR, source_gallery_path)
+    if os.path.isdir(gallery_abs):
+        return dedupe_pages(gather_media_from_gallery_tree(source_gallery_path))
+
+    pages_by_link = gather_gallery_pages(source_gallery_path)
+    pages_by_scan = gather_media_from_gallery_tree(source_gallery_path)
+    return dedupe_pages(pages_by_link + pages_by_scan)
+
+
 def iter_gallery_paths(structure_obj):
     seen = set()
     for _genre_key, _genre_data, _series_key, _series_data, item in iter_content_entries(structure_obj):
@@ -343,6 +461,42 @@ def write_gallery_pages_js(result):
         out.write(' * Auto-generated gallery pages map from site/structure.json.\n')
         out.write(' * Do not edit manually.\n')
         out.write(' */\n')
+        out.write('window.resolveGalleryPageEntries = window.resolveGalleryPageEntries || function resolveGalleryPageEntries(value, fallbackHtml) {\n')
+        out.write('  if (Array.isArray(value)) return value;\n')
+        out.write('  if (!value || !Array.isArray(value.p)) return [];\n')
+        out.write('  if (Array.isArray(value.__pages)) return value.__pages;\n')
+        out.write('  const normalize = (path) => String(path || "").replace(/\\\\/g, "/").replace(/^\\/+/, "");\n')
+        out.write('  const join = (base, path) => {\n')
+        out.write('    const normalizedPath = normalize(path);\n')
+        out.write('    if (!normalizedPath) return "";\n')
+        out.write('    if (normalizedPath.startsWith("contents/") || normalizedPath.startsWith("thumbnail/")) return normalizedPath;\n')
+        out.write('    const normalizedBase = normalize(base).replace(/\\/+$/, "");\n')
+        out.write('    return normalizedBase ? normalizedBase + "/" + normalizedPath : normalizedPath;\n')
+        out.write('  };\n')
+        out.write('  const stem = (path) => {\n')
+        out.write('    const normalizedPath = normalize(path);\n')
+        out.write('    const fileName = normalizedPath.split("/").pop() || normalizedPath;\n')
+        out.write('    return fileName.replace(/\\.[^.]+$/, "");\n')
+        out.write('  };\n')
+        out.write('  const ext = (path) => {\n')
+        out.write('    const match = /\\.([^.]+)$/.exec(String(path || ""));\n')
+        out.write('    return match ? match[1].toLowerCase() : "";\n')
+        out.write('  };\n')
+        out.write('  const base = value.b || "";\n')
+        out.write('  const thumbBase = value.t || "";\n')
+        out.write('  const html = join("", fallbackHtml || "");\n')
+        out.write('  value.__pages = value.p.map((item) => {\n')
+        out.write('    if (!Array.isArray(item) || item.length === 0) return null;\n')
+        out.write('    if (item[0] === "v") {\n')
+        out.write('      const video = join(base, item[1]);\n')
+        out.write('      return { type: "video", video, html, thumbNumber: Number(item[2]) > 0 ? Number(item[2]) : null, label: item[3] || stem(item[1] || video), ext: String(item[4] || ext(item[1] || video)).toLowerCase() };\n')
+        out.write('    }\n')
+        out.write('    const image = join(base, item[1]);\n')
+        out.write('    const thumbnail = item.length >= 3 && item[2] ? join(thumbBase || base, item[2]) : join(thumbBase || base, item[1]);\n')
+        out.write('    return { type: "image", image, thumbnail, html, label: stem(item[1] || image) };\n')
+        out.write('  }).filter(Boolean);\n')
+        out.write('  return value.__pages;\n')
+        out.write('};\n')
         out.write('window.galleryPagesMap = ')
         json.dump(result, out, ensure_ascii=False, separators=(',', ':'))
         out.write(';\n')
@@ -363,34 +517,26 @@ def build_gallery_pages_map(structure: dict, diff: bool = False) -> tuple[dict, 
             valid_galleries = set(all_gallery_paths)
             result = {key: value for key, value in existing_map.items() if key in valid_galleries}
             metadata["incremental_mode"] = True
-            target_gallery_paths = selected
+            detected = detect_changed_gallery_paths(all_gallery_paths, result)
+            target_gallery_paths = sorted(set(selected) | set(detected))
 
     thumb_generated = 0
     thumb_reused = 0
     for gallery_path in target_gallery_paths:
         source_gallery_path = resolve_gallery_source_path(gallery_path)
-        gallery_abs = os.path.join(CONTENTS_DIR, source_gallery_path)
-        if os.path.isdir(gallery_abs):
-            pages = gather_media_from_gallery_tree(source_gallery_path)
-            pages = dedupe_pages(pages)
-            generated_count, reused_count = ensure_gallery_prebuilt_thumbnails(source_gallery_path, pages)
-            thumb_generated += generated_count
-            thumb_reused += reused_count
-        else:
-            pages_by_link = gather_gallery_pages(source_gallery_path)
-            pages_by_scan = gather_media_from_gallery_tree(source_gallery_path)
-            pages = dedupe_pages(pages_by_link + pages_by_scan)
-            generated_count, reused_count = ensure_gallery_prebuilt_thumbnails(source_gallery_path, pages)
-            thumb_generated += generated_count
-            thumb_reused += reused_count
+        pages = collect_gallery_pages_for_path(source_gallery_path)
         if not pages:
+            result.pop(gallery_path, None)
             continue
-        result[gallery_path] = pages
+        generated_count, reused_count = ensure_gallery_prebuilt_thumbnails(source_gallery_path, pages)
+        thumb_generated += generated_count
+        thumb_reused += reused_count
+        result[gallery_path] = compact_gallery_pages(source_gallery_path, pages)
 
     metadata["generated"] = thumb_generated
     metadata["reused"] = thumb_reused
     metadata["gallery_count"] = len(result)
-    metadata["page_count"] = sum(len(v) for v in result.values())
+    metadata["page_count"] = sum(count_gallery_pages_entry(v) for v in result.values())
     return result, metadata
 
 

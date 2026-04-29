@@ -165,11 +165,14 @@ function createContentMeta(content) {
 }
 
 function collectPages(normalizedPath, map) {
-  if (map[normalizedPath]) return map[normalizedPath];
+  const resolver = typeof window.resolveGalleryPageEntries === 'function'
+    ? window.resolveGalleryPageEntries
+    : (value, _fallbackHtml) => (Array.isArray(value) ? value : []);
+  if (map[normalizedPath]) return resolver(map[normalizedPath], `contents/${normalizedPath}`);
   const prefix = normalizedPath + '/';
   let all = [];
   for (const [key, pages] of Object.entries(map)) {
-    if (key.startsWith(prefix) && Array.isArray(pages)) all = all.concat(pages);
+    if (key.startsWith(prefix)) all = all.concat(resolver(pages, `contents/${key}`));
   }
   return all;
 }

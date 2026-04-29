@@ -9,6 +9,15 @@ window.siteStructure = {
     "comic": {
       "name": "漫画",
       "path": "comic",
+      "class": [
+        "main-person"
+      ],
+      "classname": [
+        "著者"
+      ],
+      "browse": {
+        "leafType": "series"
+      },
       "それは霊のしわざです": {
         "path": "comic/[Noise] それは霊のしわざです",
         "name": "それは霊のしわざです",
@@ -20,43 +29,43 @@ window.siteStructure = {
         "contents": [
           {
             "path": "comic/[Noise] それは霊のしわざです/[Noise] それは霊のしわざです 第01巻_pdf",
-            "cover": "thumbnail/comic/[Noise] それは霊のしわざです/[Noise] それは霊のしわざです 第01巻_pdf/001.jpg",
+            "cover": "thumbnail/comic/[Noise] それは霊のしわざです/[Noise] それは霊のしわざです 第01巻_pdf/cover.jpg",
             "name": "[Noise] それは霊のしわざです 第01巻_pdf",
             "note": ""
           },
           {
             "path": "comic/[Noise] それは霊のしわざです/[Noise] それは霊のしわざです 第02巻_pdf",
-            "cover": "thumbnail/comic/[Noise] それは霊のしわざです/[Noise] それは霊のしわざです 第02巻_pdf/001.jpg",
+            "cover": "thumbnail/comic/[Noise] それは霊のしわざです/[Noise] それは霊のしわざです 第02巻_pdf/cover.jpg",
             "name": "[Noise] それは霊のしわざです 第02巻_pdf",
             "note": ""
           },
           {
             "path": "comic/[Noise] それは霊のしわざです/[Noise] それは霊のしわざです 第03巻_pdf",
-            "cover": "thumbnail/comic/[Noise] それは霊のしわざです/[Noise] それは霊のしわざです 第03巻_pdf/001.jpg",
+            "cover": "thumbnail/comic/[Noise] それは霊のしわざです/[Noise] それは霊のしわざです 第03巻_pdf/cover.jpg",
             "name": "[Noise] それは霊のしわざです 第03巻_pdf",
             "note": ""
           },
           {
             "path": "comic/[Noise] それは霊のしわざです/[Noise] それは霊のしわざです 第04巻_pdf",
-            "cover": "thumbnail/comic/[Noise] それは霊のしわざです/[Noise] それは霊のしわざです 第04巻_pdf/001.jpg",
+            "cover": "thumbnail/comic/[Noise] それは霊のしわざです/[Noise] それは霊のしわざです 第04巻_pdf/cover.jpg",
             "name": "[Noise] それは霊のしわざです 第04巻_pdf",
             "note": ""
           },
           {
             "path": "comic/[Noise] それは霊のしわざです/[Noise] それは霊のしわざです 第05巻_pdf",
-            "cover": "thumbnail/comic/[Noise] それは霊のしわざです/[Noise] それは霊のしわざです 第05巻_pdf/001.jpg",
+            "cover": "thumbnail/comic/[Noise] それは霊のしわざです/[Noise] それは霊のしわざです 第05巻_pdf/cover.jpg",
             "name": "[Noise] それは霊のしわざです 第05巻_pdf",
             "note": ""
           },
           {
             "path": "comic/[Noise] それは霊のしわざです/[Noise] それは霊のしわざです 第06巻_pdf",
-            "cover": "thumbnail/comic/[Noise] それは霊のしわざです/[Noise] それは霊のしわざです 第06巻_pdf/001.jpg",
+            "cover": "thumbnail/comic/[Noise] それは霊のしわざです/[Noise] それは霊のしわざです 第06巻_pdf/cover.jpg",
             "name": "[Noise] それは霊のしわざです 第06巻_pdf",
             "note": ""
           },
           {
             "path": "comic/[Noise] それは霊のしわざです/[Noise] それは霊のしわざです 第07巻_pdf",
-            "cover": "thumbnail/comic/[Noise] それは霊のしわざです/[Noise] それは霊のしわざです 第07巻_pdf/001.jpg",
+            "cover": "thumbnail/comic/[Noise] それは霊のしわざです/[Noise] それは霊のしわざです 第07巻_pdf/cover.jpg",
             "name": "[Noise] それは霊のしわざです 第07巻_pdf",
             "note": ""
           }
@@ -67,6 +76,15 @@ window.siteStructure = {
     "photo": {
       "name": "写真集",
       "path": "photo",
+      "class": [
+        "main-person"
+      ],
+      "classname": [
+        "モデル"
+      ],
+      "browse": {
+        "leafType": "content"
+      },
       "[うんぱい] uP": {
         "path": "photo/[うんぱい][20220628] uP",
         "name": "uP",

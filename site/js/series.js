@@ -4,7 +4,7 @@
  */
 
 const Series = (() => {
-  const GENRE_META_KEYS = new Set(['name', 'path', 'note', 'labels']);
+  const GENRE_META_KEYS = new Set(['name', 'path', 'note', 'labels', 'class', 'classname', 'browse']);
   const UNCATEGORIZED_SERIES = '未分類';
 
   // ---- Data access ----
@@ -72,6 +72,71 @@ const Series = (() => {
       : '';
   }
 
+  function getGenreClassConfig(structure, genreKey) {
+    const genres = getGenres(structure);
+    const genre = genres[genreKey];
+    if (!genre || typeof genre !== 'object') {
+      return {
+        classKeys: [],
+        classNames: [],
+        browse: {
+          leafType: 'series',
+          contentGroupBy: 'flat',
+          unknownLabel: UNCATEGORIZED_SERIES,
+        },
+      };
+    }
+
+    const classKeys = Array.isArray(genre.class)
+      ? genre.class.filter((key) => typeof key === 'string' && key.trim().length > 0)
+      : [];
+
+    const classNamesRaw = Array.isArray(genre.classname) ? genre.classname : [];
+    const classNames = classKeys.map((key, index) => {
+      const name = classNamesRaw[index];
+      return (typeof name === 'string' && name.trim().length > 0) ? name.trim() : key;
+    });
+
+    const browseRaw = (genre.browse && typeof genre.browse === 'object') ? genre.browse : {};
+    const leafType = browseRaw.leafType === 'content' ? 'content' : 'series';
+    const allowedGroupBy = new Set(['flat', 'none', 'path-depth-1', 'path-depth-2']);
+    const contentGroupBy = allowedGroupBy.has(browseRaw.contentGroupBy)
+      ? browseRaw.contentGroupBy
+      : 'flat';
+    const unknownLabel = (typeof browseRaw.unknownLabel === 'string' && browseRaw.unknownLabel.trim().length > 0)
+      ? browseRaw.unknownLabel.trim()
+      : UNCATEGORIZED_SERIES;
+
+    return {
+      classKeys,
+      classNames,
+      browse: {
+        leafType,
+        contentGroupBy,
+        unknownLabel,
+      },
+    };
+  }
+
+  function getEntryClassValues(entryData, classKey) {
+    if (!entryData || !classKey) return [];
+    const value = entryData[classKey];
+
+    if (typeof value === 'string') {
+      const trimmed = value.trim();
+      return trimmed ? [trimmed] : [];
+    }
+
+    if (Array.isArray(value)) {
+      return value
+        .filter((item) => typeof item === 'string')
+        .map((item) => item.trim())
+        .filter(Boolean);
+    }
+
+    return [];
+  }
+
   function getPersonList(entryData) {
     const main = getMainPerson(entryData);
     const extras = (entryData && Array.isArray(entryData.persons))
@@ -90,6 +155,14 @@ const Series = (() => {
 
   function buildSeriesHref(genreKey, seriesKey) {
     return 'project.html?genre=' + encodeURIComponent(genreKey) + '&series=' + encodeURIComponent(seriesKey);
+  }
+
+  function buildGenreClassBrowseHref(genreKey, classValue) {
+    let href = 'index.html?genre=' + encodeURIComponent(genreKey) + '&classBrowse=1';
+    if (typeof classValue === 'string' && classValue.trim().length > 0) {
+      href += '&classValue=' + encodeURIComponent(classValue.trim());
+    }
+    return href;
   }
 
   function buildGalleryHref(genreKey, seriesKey, contentPath) {
@@ -129,6 +202,42 @@ const Series = (() => {
     const divider = document.createElement('hr');
     divider.className = 'sidebar-divider';
     container.appendChild(divider);
+
+    const classBrowseList = document.createElement('div');
+    classBrowseList.className = 'sidebar-list';
+
+    const url = new URL(window.location.href);
+    const currentGenre = decodeURIComponent(url.searchParams.get('genre') || '');
+    const isClassBrowse = url.searchParams.get('classBrowse') === '1';
+
+    for (const [genreKey, genreData] of Object.entries(getGenres(structure))) {
+      if (!genreData || typeof genreData !== 'object') continue;
+      const { classKeys, classNames } = getGenreClassConfig(structure, genreKey);
+      if (classKeys.length === 0) continue;
+
+      const primaryClassName = classNames[0] || classKeys[0];
+      const link = document.createElement('a');
+      link.className = 'sidebar-link';
+      link.href = buildGenreClassBrowseHref(genreKey);
+      link.textContent = (genreData.name || genreKey) + '：' + primaryClassName + '一覧';
+
+      if (window.location.pathname.endsWith('index.html')
+        && isClassBrowse
+        && currentGenre === genreKey) {
+        link.classList.add('is-active');
+        link.setAttribute('aria-current', 'page');
+      }
+
+      classBrowseList.appendChild(link);
+    }
+
+    if (classBrowseList.childElementCount > 0) {
+      container.appendChild(classBrowseList);
+
+      const secondDivider = document.createElement('hr');
+      secondDivider.className = 'sidebar-divider';
+      container.appendChild(secondDivider);
+    }
 
     const personsLink = document.createElement('a');
     personsLink.className = 'sidebar-link';
@@ -172,9 +281,12 @@ const Series = (() => {
     getFirstContentCover,
     getContentCount,
     getMainPerson,
+    getGenreClassConfig,
+    getEntryClassValues,
     getPersonList,
     buildGenreHref,
     buildSeriesHref,
+    buildGenreClassBrowseHref,
     buildGalleryHref,
     renderGenreSidebar,
     renderSeriesSidebar,

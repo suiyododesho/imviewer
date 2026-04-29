@@ -3,6 +3,7 @@ import unittest
 from pathlib import Path
 
 from tools import build_gallery_pages_map
+from tools import maint_build_gallery_pages
 
 
 class GalleryDiffBuildTests(unittest.TestCase):
@@ -36,6 +37,11 @@ class GalleryDiffBuildTests(unittest.TestCase):
 
         self.assertIsInstance(loaded, dict)
         self.assertIn("photo/a/index.html", loaded)
+
+    def test_count_gallery_pages_entry_supports_compact_format(self):
+        entry = {"b": "contents/photo/a", "p": [["i", "001.jpg"], ["i", "002.jpg"], ["v", "clip.mp4", 1]]}
+
+        self.assertEqual(maint_build_gallery_pages.count_gallery_pages_entry(entry), 3)
 
 
 if __name__ == "__main__":

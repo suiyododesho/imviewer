@@ -8,6 +8,25 @@ from tools import release
 
 
 class ReleaseFilterTests(unittest.TestCase):
+    def test_iter_system_targets_includes_tools_bin(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            site_dir = root / "site"
+            tools_bin_dir = root / "tools" / "bin"
+            site_dir.mkdir(parents=True, exist_ok=True)
+            tools_bin_dir.mkdir(parents=True, exist_ok=True)
+            (site_dir / "index.html").write_text("ok", encoding="utf-8")
+            (tools_bin_dir / "build_site_config.exe").write_text("bin", encoding="utf-8")
+
+            with patch.object(release, "SITE_DIR", str(site_dir)), patch.object(
+                release, "TOOLS_BIN_DIR", str(tools_bin_dir)
+            ):
+                targets = release._iter_system_targets()
+
+        arc_names = [arc for arc, _ in targets]
+        self.assertIn("index.html", arc_names)
+        self.assertIn("tools/bin", arc_names)
+
     def test_collect_structure_targets_from_structure_json(self):
         sample = {
             "contents-root": "contents",

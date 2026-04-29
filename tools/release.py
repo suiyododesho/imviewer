@@ -27,6 +27,9 @@ from history_manager import parse_history, write_history  # noqa: E402
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 SITE_DIR = os.path.join(ROOT, "site")
+TOOLS_DIR = os.path.join(ROOT, "tools")
+TOOLS_BIN_DIR = os.path.join(TOOLS_DIR, "bin")
+BUILD_MAINTENANCE_BIN_SCRIPT = os.path.join(TOOLS_DIR, "build_maintenance_bin.py")
 CONTENTS_DIR = os.path.join(SITE_DIR, "contents")
 PHOTO_ROOT = os.path.join(CONTENTS_DIR, "photo")
 THUMBNAIL_DIR = os.path.join(SITE_DIR, "thumbnail")
@@ -265,7 +268,37 @@ def _iter_system_targets() -> list[tuple[str, str]]:
         if name in SYSTEM_EXCLUDED_TOP_LEVEL:
             continue
         targets.append((name, os.path.join(SITE_DIR, name)))
+    targets.append(("tools/bin", TOOLS_BIN_DIR))
     return targets
+
+
+def _build_tools_bin_for_release(dry_run: bool = False) -> None:
+    if not os.path.isfile(BUILD_MAINTENANCE_BIN_SCRIPT):
+        raise RuntimeError(
+            f"tools/bin ビルドスクリプトが見つかりません: {BUILD_MAINTENANCE_BIN_SCRIPT}"
+        )
+
+    if dry_run:
+        print("[DRY RUN] tools/bin は system リリース時に再ビルドされます。")
+        print(f"[DRY RUN] 実行予定: {sys.executable} {BUILD_MAINTENANCE_BIN_SCRIPT} build_exe")
+        return
+
+    print("tools/bin をビルドしています...")
+    result = subprocess.run(
+        [sys.executable, BUILD_MAINTENANCE_BIN_SCRIPT, "build_exe"],
+        cwd=ROOT,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+        check=False,
+    )
+    if result.returncode != 0:
+        detail = (result.stderr or result.stdout or "").strip()
+        raise RuntimeError(f"tools/bin のビルドに失敗しました: {detail}")
+
+    if not os.path.isdir(TOOLS_BIN_DIR):
+        raise RuntimeError("tools/bin のビルド結果が見つかりません。")
 
 
 def _create_system_zip(tag_name: str, dry_run: bool = False) -> str:
@@ -276,7 +309,7 @@ def _create_system_zip(tag_name: str, dry_run: bool = False) -> str:
 
     if dry_run:
         print(f"\n[DRY RUN] 作成予定のシステムパッケージ: {zip_path}")
-        print("[DRY RUN] site/ 直下の同梱対象:")
+        print("[DRY RUN] 同梱対象:")
         for arc_name, _ in targets:
             print(f"  {arc_name}")
         print("[DRY RUN] 除外対象:")
@@ -376,12 +409,14 @@ def cmd_system_release(args) -> None:
     print(f"Git tag          : {tag_name}")
 
     if args.dry_run:
+        _build_tools_bin_for_release(dry_run=True)
         _create_system_zip(tag_name, dry_run=True)
         print(f"[DRY RUN] 作成予定の Git tag: {tag_name}")
         print("\n[DRY RUN] ファイルは変更していません。")
         return
 
     _ensure_git_tag_available(tag_name)
+    _build_tools_bin_for_release(dry_run=False)
     _write_version(VERSION_SYS_PATH, new_version)
     zip_path = _create_system_zip(tag_name)
     _create_git_tag(tag_name)

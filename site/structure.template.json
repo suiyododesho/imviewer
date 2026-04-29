@@ -4,6 +4,15 @@
     "comic": {
       "name": "漫画",
       "path": "comic",
+      "class": [
+        "main-person"
+      ],
+      "classname": [
+        "著者"
+      ],
+      "browse": {
+        "leafType": "series"
+      },
       "00001": {
         "path": "",
         "name": "",
@@ -19,6 +28,15 @@
     "photo": {
       "name": "写真集",
       "path": "photo",
+      "class": [
+        "main-person"
+      ],
+      "classname": [
+        "モデル"
+      ],
+      "browse": {
+        "leafType": "content"
+      },
       "00001": {
         "path": "",
         "name": "",

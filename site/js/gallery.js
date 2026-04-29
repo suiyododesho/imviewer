@@ -1640,7 +1640,13 @@ function handleSwipeNavigationMove(event) {
     }
   }
 
-  if (swipeNavState.axis === 'x' && event.cancelable) {
+  // 中央エリア（画面幅10%～90%）での上下動きはスクロール許可
+  const isLeftEdge = swipeNavState.startX < window.innerWidth * 0.1;
+  const isRightEdge = swipeNavState.startX > window.innerWidth * 0.9;
+  const isNavigationArea = isLeftEdge || isRightEdge;
+
+  // navigation領域またはX軸動きの場合のみpreventDefault
+  if ((isNavigationArea || swipeNavState.axis === 'x') && event.cancelable) {
     event.preventDefault();
   }
 }
@@ -1660,32 +1666,30 @@ function handleSwipeNavigationEnd(event) {
 
   const deltaX = event.clientX - swipeNavState.startX;
   const deltaY = event.clientY - swipeNavState.startY;
-  const elapsedMs = Date.now() - swipeNavState.startTimeMs;
-
   const absX = Math.abs(deltaX);
   const absY = Math.abs(deltaY);
-
-  const isQuickFlick = elapsedMs <= 260
-    && absX >= 24
-    && absX >= absY * 0.9;
-
-  const isSwipe = elapsedMs <= 950
-    && absX >= 48
-    && absY <= 96
-    && absX >= absY * 0.95;
-
-  const isValidSwipe = swipeNavState.axis !== 'y' && (isQuickFlick || isSwipe);
 
   swipeNavState.pointerId = null;
   swipeNavState.axis = 'none';
 
-  if (!isValidSwipe) {
+  // 中央エリアでの上下動きの場合はナビゲーションしない（ブラウザスクロール優先）
+  const isCenterArea = swipeNavState.startX >= window.innerWidth * 0.1 && swipeNavState.startX < window.innerWidth * 0.9;
+  if (isCenterArea && swipeNavState.axis === 'y') {
     return;
   }
 
-  if (deltaX < 0) {
+  // 画面幅の10%単位でエリアを判定
+  const tapX = event.clientX;
+  const isLeftEdge = tapX < window.innerWidth * 0.1;
+  const isRightEdge = tapX > window.innerWidth * 0.9;
+
+  // タップだけで判定（動きが小さい場合）、またはスワイプ（移動が大きい場合）で対応
+  const isTap = absX < 12 && absY < 12;
+  const isHorizontalSwipe = absX >= 24;
+
+  if (isRightEdge && (isTap || isHorizontalSwipe)) {
     navigateNextPage();
-  } else {
+  } else if (isLeftEdge && (isTap || isHorizontalSwipe)) {
     navigatePrevPage();
   }
 }

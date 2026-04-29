@@ -49,7 +49,7 @@ Reusable CLI tool:
 
 | パターン | 対処 |
 |----------|------|
-| タグが既に存在する | `release.py` がエラーで終了する。既存 tag への再 upload が目的なら、Release を直接開いて手動 upload するか、zip が存在する状態で upload ステップだけ再実行する |
+| タグが既に存在する | `release.py` が「Git tag は既に存在します」エラーで終了する。ワークフローは冪等性を持たないため、同じバージョンの再 upload は GitHub の Release ページから直接アセットをアップロードするか、ローカルで `gh release upload` コマンドを使用する |
 | cx_Freeze のビルドに失敗 | `tools/build_maintenance_bin.py` の依存ライブラリ（`pillow`, `pymupdf` 等）が正しくインストールされているか確認する |
 | git push が失敗 | ブランチ保護ルールや GITHUB_TOKEN の権限を確認する。ワークフローに `permissions: contents: write` が付与されていることを確認する |
 | zip が見つからない | `releases/` ディレクトリが正しく作成されているか、スクリプトのエラーログを確認する |

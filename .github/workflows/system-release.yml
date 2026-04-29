@@ -124,8 +124,19 @@ jobs:
           Write-Host "Staging site/version_sys.txt for tag: $tag"
           git add site/version_sys.txt
           git status
-          git commit -m "chore: bump system version [$tag]"
-          Write-Host "Committed version_sys.txt (tag: $tag)"
+
+          # Only commit if there is actually a staged change
+          git diff --cached --quiet
+          if ($LASTEXITCODE -eq 0) {
+            Write-Host "No changes staged for version_sys.txt – skipping commit."
+          } else {
+            git commit -m "chore: bump system version [$tag]"
+            if ($LASTEXITCODE -ne 0) {
+              Write-Error "git commit failed"
+              exit $LASTEXITCODE
+            }
+            Write-Host "Committed version_sys.txt (tag: $tag)"
+          }
 
       # -----------------------------------------------------------------------
       # 7. Push commit and git tag to remote

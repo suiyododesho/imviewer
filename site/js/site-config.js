@@ -4,5 +4,5 @@
  */
 
 window.siteConfig = {
-  "defaultSeries": "Juicy Honey"
+  "defaultSeries": "comic"
 };

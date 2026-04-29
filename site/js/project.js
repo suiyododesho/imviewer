@@ -88,11 +88,11 @@ function renderContentsList() {
 
 function createContentCard(content) {
   const link = document.createElement('a');
-  link.className = 'gallery-item';
+  link.className = 'gallery-item project-content-card';
   link.href = Series.buildGalleryHref(currentGenre, currentSeriesKey, content.path);
 
   const thumbDiv = document.createElement('div');
-  thumbDiv.className = 'gallery-thumbnail';
+  thumbDiv.className = 'gallery-thumbnail project-content-thumb';
   if (content.cover) {
     const img = document.createElement('img');
     img.src = content.cover;
@@ -103,12 +103,28 @@ function createContentCard(content) {
   } else {
     thumbDiv.innerHTML = '<div class="gallery-thumbnail-placeholder">No image</div>';
   }
+
+  const info = document.createElement('div');
+  info.className = 'project-content-info';
+
+  const titleDiv = document.createElement('div');
+  titleDiv.className = 'project-content-title';
+  titleDiv.textContent = content.name || '';
+
+  const mainPersonDiv = document.createElement('div');
+  mainPersonDiv.className = 'project-content-line';
+  mainPersonDiv.textContent = '人名(main): ' + (currentSeriesData['main-person'] || 'なし');
+
+  const pageCountDiv = document.createElement('div');
+  pageCountDiv.className = 'project-content-line';
+  pageCountDiv.textContent = 'ページ数: ' + getPageCount(content.path);
+
+  info.appendChild(titleDiv);
+  info.appendChild(mainPersonDiv);
+  info.appendChild(pageCountDiv);
+
   link.appendChild(thumbDiv);
-  link.appendChild(createContentMeta(content));
-  const labelDiv = document.createElement('div');
-  labelDiv.className = 'gallery-label';
-  labelDiv.textContent = content.name || '';
-  link.appendChild(labelDiv);
+  link.appendChild(info);
   return link;
 }
 

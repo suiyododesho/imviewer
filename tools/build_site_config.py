@@ -4,9 +4,13 @@
 from __future__ import annotations
 
 import json
+import sys
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parent.parent
+if getattr(sys, "frozen", False):
+    ROOT = Path(sys.executable).resolve().parents[2]
+else:
+    ROOT = Path(__file__).resolve().parent.parent
 SITE_DIR = ROOT / "site"
 CONFIG_JSON_PATH = SITE_DIR / "sitedesign.json"
 CONFIG_JS_PATH = SITE_DIR / "js" / "site-config.js"

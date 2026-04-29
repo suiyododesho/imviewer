@@ -4,9 +4,13 @@ from __future__ import annotations
 
 import json
 import os
+import sys
 from collections import OrderedDict
 
-ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+if getattr(sys, "frozen", False):
+    ROOT = os.path.abspath(os.path.join(os.path.dirname(sys.executable), "..", ".."))
+else:
+    ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 SITE_DIR = os.path.join(ROOT, "site")
 CONTENTS_DIR = os.path.join(SITE_DIR, "contents")
 THUMBNAIL_DIR = os.path.join(SITE_DIR, "thumbnail")

@@ -1682,9 +1682,10 @@ function handleSwipeNavigationMove(event) {
     }
   }
 
-  // 中央エリア（画面幅10%～90%）での上下動きはスクロール許可
-  const isLeftEdge = swipeNavState.startX < window.innerWidth * 0.1;
-  const isRightEdge = swipeNavState.startX > window.innerWidth * 0.9;
+  // 開始位置は表示ステージ基準で判定する。
+  const zones = getSwipeNavigationZones();
+  const isLeftEdge = swipeNavState.startX <= zones.leftEdgeMaxX;
+  const isRightEdge = swipeNavState.startX >= zones.rightEdgeMinX;
   const isNavigationArea = isLeftEdge || isRightEdge;
 
   // navigation領域またはX軸動きの場合のみpreventDefault
@@ -1710,20 +1711,21 @@ function handleSwipeNavigationEnd(event) {
   const deltaY = event.clientY - swipeNavState.startY;
   const absX = Math.abs(deltaX);
   const absY = Math.abs(deltaY);
+  const resolvedAxis = swipeNavState.axis;
+  const zones = getSwipeNavigationZones();
 
   swipeNavState.pointerId = null;
   swipeNavState.axis = 'none';
 
   // 中央エリアでの上下動きの場合はナビゲーションしない（ブラウザスクロール優先）
-  const isCenterArea = swipeNavState.startX >= window.innerWidth * 0.1 && swipeNavState.startX < window.innerWidth * 0.9;
-  if (isCenterArea && swipeNavState.axis === 'y') {
+  const isCenterArea = swipeNavState.startX > zones.leftEdgeMaxX && swipeNavState.startX < zones.rightEdgeMinX;
+  if (isCenterArea && resolvedAxis === 'y') {
     return;
   }
 
-  // 画面幅の10%単位でエリアを判定
-  const tapX = event.clientX;
-  const isLeftEdge = tapX < window.innerWidth * 0.1;
-  const isRightEdge = tapX > window.innerWidth * 0.9;
+  // ゾーン判定はタップ終了位置ではなく開始位置で固定する。
+  const isLeftEdge = swipeNavState.startX <= zones.leftEdgeMaxX;
+  const isRightEdge = swipeNavState.startX >= zones.rightEdgeMinX;
 
   // タップだけで判定（動きが小さい場合）、またはスワイプ（移動が大きい場合）で対応
   const isTap = absX < 12 && absY < 12;
@@ -1734,6 +1736,35 @@ function handleSwipeNavigationEnd(event) {
   } else if (isLeftEdge && (isTap || isHorizontalSwipe)) {
     navigatePrevPage();
   }
+}
+
+function getSwipeNavigationZones() {
+  const fallbackWidth = Math.max(1, window.innerWidth || 1);
+  const fallbackZone = fallbackWidth * 0.12;
+  const fallbackLeft = fallbackZone;
+  const fallbackRight = fallbackWidth - fallbackZone;
+
+  if (!zoomState.stage) {
+    return {
+      leftEdgeMaxX: fallbackLeft,
+      rightEdgeMinX: fallbackRight,
+    };
+  }
+
+  const rect = zoomState.stage.getBoundingClientRect();
+  const stageWidth = Math.max(1, rect.width || 0);
+  if (!Number.isFinite(stageWidth) || stageWidth <= 1) {
+    return {
+      leftEdgeMaxX: fallbackLeft,
+      rightEdgeMinX: fallbackRight,
+    };
+  }
+
+  const zoneWidth = Math.max(44, stageWidth * 0.12);
+  return {
+    leftEdgeMaxX: rect.left + zoneWidth,
+    rightEdgeMinX: rect.right - zoneWidth,
+  };
 }
 
 function canStartSwipeNavigation(event) {

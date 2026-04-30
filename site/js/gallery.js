@@ -30,6 +30,7 @@ const zoomState = {
   dragOriginPanX: 0,
   dragOriginPanY: 0,
   activeImage: null,
+  spreadWrapper: null,
   stage: null,
   control: null,
   slider: null,
@@ -736,7 +737,7 @@ function renderStageContent(stage, spreadInfo) {
   });
 
   stage.prepend(wrapper);
-  setZoomMedia(null);
+  setZoomSpread(wrapper);
 }
 
 function renderSingleStageContent(stage, page) {
@@ -1487,6 +1488,7 @@ function setupZoomInteractions() {
 
 function setZoomMedia(imageElement) {
   zoomState.activeImage = imageElement || null;
+  zoomState.spreadWrapper = null;
   zoomState.percent = ZOOM_MIN_PERCENT;
   zoomState.panX = 0;
   zoomState.panY = 0;
@@ -1511,6 +1513,27 @@ function setZoomMedia(imageElement) {
   }
 }
 
+function setZoomSpread(wrapperElement) {
+  zoomState.activeImage = null;
+  zoomState.spreadWrapper = wrapperElement || null;
+  zoomState.percent = ZOOM_MIN_PERCENT;
+  zoomState.panX = 0;
+  zoomState.panY = 0;
+  zoomState.isDragging = false;
+  zoomState.pointerId = null;
+
+  if (!zoomState.spreadWrapper) {
+    setZoomControlEnabled(false);
+    updateZoomIndicator();
+    updateZoomCssState();
+    return;
+  }
+
+  setZoomControlEnabled(true);
+  updateZoomIndicator();
+  applyZoomTransform();
+}
+
 function resetZoomState() {
   zoomState.percent = ZOOM_MIN_PERCENT;
   zoomState.panX = 0;
@@ -1522,9 +1545,11 @@ function resetZoomState() {
 }
 
 function handleStageWheel(event) {
-  if (!zoomState.activeImage) return;
-
   if (thumbnailModeState.enabled) {
+    return;
+  }
+
+  if (!ensureZoomableImageForInteraction()) {
     return;
   }
 
@@ -1539,7 +1564,7 @@ function handleStageWheel(event) {
 }
 
 function setZoomPercent(nextPercent, options = {}) {
-  if (!zoomState.activeImage) {
+  if (!zoomState.activeImage && !zoomState.spreadWrapper && !ensureZoomableImageForInteraction()) {
     updateZoomIndicator();
     return;
   }
@@ -1580,8 +1605,12 @@ function setZoomPercent(nextPercent, options = {}) {
   updateZoomIndicator();
 }
 
+function ensureZoomableImageForInteraction() {
+  return !!(zoomState.activeImage || zoomState.spreadWrapper);
+}
+
 function handlePanStart(event) {
-  if (!zoomState.activeImage || zoomState.percent <= ZOOM_MIN_PERCENT) return;
+  if ((!zoomState.activeImage && !zoomState.spreadWrapper) || zoomState.percent <= ZOOM_MIN_PERCENT) return;
   if (event.button !== 0) return;
   if (event.target && typeof event.target.closest === 'function' && event.target.closest('#zoomControl')) return;
   if (thumbnailModeState.enabled) return;
@@ -1745,21 +1774,22 @@ function handlePanEnd(event) {
 }
 
 function handleViewportChanged() {
-  if (!zoomState.activeImage) return;
+  if (!zoomState.activeImage && !zoomState.spreadWrapper) return;
   clampPanOffsets();
   applyZoomTransform();
 }
 
 function clampPanOffsets() {
-  if (!zoomState.activeImage || !zoomState.stage) return;
+  const target = zoomState.activeImage || zoomState.spreadWrapper;
+  if (!target || !zoomState.stage) return;
   if (zoomState.percent <= ZOOM_MIN_PERCENT) {
     zoomState.panX = 0;
     zoomState.panY = 0;
     return;
   }
 
-  const baseWidth = zoomState.activeImage.clientWidth;
-  const baseHeight = zoomState.activeImage.clientHeight;
+  const baseWidth = target.clientWidth;
+  const baseHeight = target.clientHeight;
   if (!baseWidth || !baseHeight) return;
 
   const stageWidth = zoomState.stage.clientWidth;
@@ -1777,25 +1807,27 @@ function clampPanOffsets() {
 }
 
 function applyZoomTransform() {
-  if (!zoomState.activeImage) {
+  const target = zoomState.activeImage || zoomState.spreadWrapper;
+  if (!target) {
     updateZoomCssState();
     return;
   }
 
   const scale = zoomState.percent / 100;
-  zoomState.activeImage.style.transform = `translate(${zoomState.panX}px, ${zoomState.panY}px) scale(${scale})`;
+  target.style.transform = `translate(${zoomState.panX}px, ${zoomState.panY}px) scale(${scale})`;
   updateZoomCssState();
 }
 
 function updateZoomCssState() {
+  const target = zoomState.activeImage || zoomState.spreadWrapper;
   if (zoomState.stage) {
-    const zoomable = !!zoomState.activeImage && zoomState.percent > ZOOM_MIN_PERCENT;
+    const zoomable = !!target && zoomState.percent > ZOOM_MIN_PERCENT;
     zoomState.stage.classList.toggle('is-zoomable', zoomable);
     zoomState.stage.classList.toggle('is-dragging', zoomState.isDragging);
   }
 
-  if (zoomState.activeImage) {
-    zoomState.activeImage.classList.toggle('is-dragging', zoomState.isDragging);
+  if (target) {
+    target.classList.toggle('is-dragging', zoomState.isDragging);
   }
 }
 
@@ -1941,6 +1973,7 @@ function toggleDisplayModeMenu() {
 
 function applyGalleryViewMode(mode, persist) {
   const normalized = normalizeGalleryViewMode(mode);
+
   if (normalized === galleryDisplayState.mode) {
     renderDisplayModeMenu();
     updateDisplayModeButton();

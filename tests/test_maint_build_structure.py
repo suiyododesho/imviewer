@@ -340,6 +340,18 @@ class MaintBuildStructureTests(unittest.TestCase):
 
         self.assertEqual([item["path"] for item in entries], ["comic/series-b/book02_cbz"])
 
+    def test_scan_contents_entries_maps_pdf_file_to_generated_pdf_directory(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            contents_dir = Path(tmp) / "contents"
+            series_dir = contents_dir / "comic" / "series-c"
+            series_dir.mkdir(parents=True)
+            (series_dir / "book03.pdf").write_bytes(b"%PDF-1.7")
+
+            with patch.object(maint_structure_lib, "CONTENTS_DIR", str(contents_dir)):
+                entries = maint_structure_lib.scan_contents_entries("comic/series-c")
+
+        self.assertEqual([item["path"] for item in entries], ["comic/series-c/book03_pdf"])
+
     def test_gather_media_from_gallery_tree_sorts_by_filename(self):
         with tempfile.TemporaryDirectory() as tmp:
             contents_dir = Path(tmp) / "contents"

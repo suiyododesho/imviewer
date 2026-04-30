@@ -194,25 +194,22 @@ def scan_contents_entries(series_root_rel: str) -> list[dict]:
             }]
         return []
 
-    # Skip archive files that already have an extracted directory sibling
-    # e.g., skip "foo.pdf" if "foo_pdf" directory exists
+    # Archive files are represented by their generated directory paths
+    # (e.g., "foo.pdf" -> "foo_pdf") and never by the original file path.
     subdir_set = {s.lower() for s in subdirs}
-    filtered_archives = [
-        (child_name, archive_kind)
-        for child_name, archive_kind in archive_files
-        if f"{os.path.splitext(child_name)[0]}_{archive_kind}".lower() not in subdir_set
-    ]
+    generated_archive_dirs: list[str] = []
+    for child_name, _archive_kind in archive_files:
+        archive_rel = norm_rel(os.path.join(normalized_root, child_name))
+        generated_rel = get_archive_content_dir_rel(archive_rel)
+        generated_name = os.path.basename(generated_rel)
+        if generated_name.lower() in subdir_set:
+            continue
+        generated_archive_dirs.append(generated_name)
+
+    all_subdirs = sorted(set(subdirs + generated_archive_dirs), key=str.lower)
 
     entries: list[dict] = []
-    for child_name in subdirs:
-        child_rel = norm_rel(os.path.join(normalized_root, child_name))
-        entries.append({
-            "path": child_rel,
-            "cover": "",
-            "name": _content_display_name(child_rel),
-            "note": "",
-        })
-    for child_name, _archive_kind in filtered_archives:
+    for child_name in all_subdirs:
         child_rel = norm_rel(os.path.join(normalized_root, child_name))
         entries.append({
             "path": child_rel,

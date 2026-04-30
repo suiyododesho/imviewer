@@ -107,6 +107,14 @@ const galleryDisplayState = {
   menuOpen: false,
 };
 
+const fullscreenState = {
+  pseudoEnabled: false,
+  container: null,
+  button: null,
+  exitButton: null,
+  nativeSupported: false,
+};
+
 // ============ Initialization ============
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -2031,19 +2039,37 @@ function setupNavigation() {
   const prevButton = document.getElementById('prevButton');
   const nextButton = document.getElementById('nextButton');
   const fullscreenToggle = document.getElementById('fullscreenToggle');
-  const fullscreenSupported = canUseGalleryFullscreen();
+  const pseudoFullscreenExit = document.getElementById('pseudoFullscreenExit');
+
+  fullscreenState.container = document.getElementById('photoViewer');
+  fullscreenState.button = fullscreenToggle;
+  fullscreenState.exitButton = pseudoFullscreenExit;
+  fullscreenState.nativeSupported = canUseGalleryFullscreen();
 
   if (prevButton) prevButton.addEventListener('click', navigatePrevPage);
   if (nextButton) nextButton.addEventListener('click', navigateNextPage);
   if (fullscreenToggle) {
-    if (fullscreenSupported) {
-      fullscreenToggle.addEventListener('click', toggleFullscreen);
-    } else {
-      fullscreenToggle.hidden = true;
-    }
+    fullscreenToggle.addEventListener('click', toggleFullscreen);
+    syncFullscreenButtonState();
+  }
+  if (pseudoFullscreenExit) {
+    pseudoFullscreenExit.addEventListener('click', () => {
+      exitGalleryFullscreen();
+    });
+  }
+
+  document.addEventListener('fullscreenchange', handleFullscreenChange);
+  window.addEventListener('resize', updatePseudoFullscreenViewportHeight);
+  if (window.visualViewport) {
+    window.visualViewport.addEventListener('resize', updatePseudoFullscreenViewportHeight);
   }
 
   document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && (fullscreenState.pseudoEnabled || isNativeFullscreenActive())) {
+      exitGalleryFullscreen();
+      return;
+    }
+
     if (e.key === 'Escape' && galleryDisplayState.menuOpen) {
       closeDisplayModeMenu();
       return;
@@ -2056,7 +2082,7 @@ function setupNavigation() {
 
     if (e.key === 'ArrowLeft') navigatePrevPage();
     if (e.key === 'ArrowRight') navigateNextPage();
-    if (fullscreenSupported && e.key.toLowerCase() === 'f') toggleFullscreen();
+    if (e.key.toLowerCase() === 'f') toggleFullscreen();
   });
 }
 
@@ -2207,23 +2233,120 @@ function renderGalleryPageNav() {
 }
 
 async function toggleFullscreen() {
-  const container = document.getElementById('photoViewer');
-  const button = document.getElementById('fullscreenToggle');
-  if (!container || !button || !canUseGalleryFullscreen()) return;
+  const container = fullscreenState.container || document.getElementById('photoViewer');
+  const button = fullscreenState.button || document.getElementById('fullscreenToggle');
+  if (!container || !button) return;
+
+  fullscreenState.container = container;
+  fullscreenState.button = button;
+  fullscreenState.nativeSupported = canUseGalleryFullscreen();
+
+  if (fullscreenState.pseudoEnabled || isNativeFullscreenActive()) {
+    await exitGalleryFullscreen();
+    return;
+  }
 
   try {
-    if (!document.fullscreenElement) {
+    if (fullscreenState.nativeSupported) {
       await container.requestFullscreen();
-      button.textContent = '全画面解除';
-      button.setAttribute('aria-pressed', 'true');
+      syncFullscreenButtonState();
     } else {
-      await document.exitFullscreen();
-      button.textContent = '全画面';
-      button.setAttribute('aria-pressed', 'false');
+      enterPseudoFullscreen();
     }
   } catch (error) {
-    console.debug('Fullscreen API not available:', error);
+    console.debug('Fullscreen API not available. Using pseudo fullscreen:', error);
+    enterPseudoFullscreen();
   }
+}
+
+function isNativeFullscreenActive() {
+  return !!(fullscreenState.container && document.fullscreenElement === fullscreenState.container);
+}
+
+async function exitGalleryFullscreen() {
+  if (fullscreenState.pseudoEnabled) {
+    exitPseudoFullscreen();
+    return;
+  }
+
+  if (isNativeFullscreenActive() && typeof document.exitFullscreen === 'function') {
+    try {
+      await document.exitFullscreen();
+    } catch (error) {
+      console.debug('Failed to exit Fullscreen API:', error);
+    }
+  }
+
+  syncFullscreenButtonState();
+}
+
+function enterPseudoFullscreen() {
+  const container = fullscreenState.container;
+  if (!container) {
+    return;
+  }
+
+  fullscreenState.pseudoEnabled = true;
+  document.body.classList.add('gallery-pseudo-fullscreen-active');
+  container.classList.add('is-pseudo-fullscreen');
+  updatePseudoFullscreenViewportHeight();
+  syncFullscreenButtonState();
+  handleViewportChanged();
+}
+
+function exitPseudoFullscreen() {
+  if (!fullscreenState.pseudoEnabled) {
+    return;
+  }
+
+  fullscreenState.pseudoEnabled = false;
+  document.body.classList.remove('gallery-pseudo-fullscreen-active');
+  if (fullscreenState.container) {
+    fullscreenState.container.classList.remove('is-pseudo-fullscreen');
+  }
+  document.documentElement.style.removeProperty('--gallery-fullscreen-vh');
+  syncFullscreenButtonState();
+  handleViewportChanged();
+}
+
+function updatePseudoFullscreenViewportHeight() {
+  if (!fullscreenState.pseudoEnabled) {
+    return;
+  }
+
+  const viewportHeight = window.visualViewport ? window.visualViewport.height : window.innerHeight;
+  if (!Number.isFinite(viewportHeight) || viewportHeight <= 0) {
+    return;
+  }
+
+  document.documentElement.style.setProperty('--gallery-fullscreen-vh', `${Math.round(viewportHeight)}px`);
+}
+
+function handleFullscreenChange() {
+  if (fullscreenState.pseudoEnabled && document.fullscreenElement) {
+    exitPseudoFullscreen();
+    return;
+  }
+
+  syncFullscreenButtonState();
+  handleViewportChanged();
+}
+
+function syncFullscreenButtonState() {
+  const button = fullscreenState.button || document.getElementById('fullscreenToggle');
+  const pseudoExitButton = fullscreenState.exitButton || document.getElementById('pseudoFullscreenExit');
+
+  if (pseudoExitButton) {
+    pseudoExitButton.hidden = !fullscreenState.pseudoEnabled;
+  }
+
+  if (!button) {
+    return;
+  }
+
+  const active = fullscreenState.pseudoEnabled || isNativeFullscreenActive();
+  button.textContent = active ? '全画面解除' : '全画面';
+  button.setAttribute('aria-pressed', active ? 'true' : 'false');
 }
 
 // ============ Search ============

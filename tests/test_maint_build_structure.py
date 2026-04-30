@@ -11,6 +11,55 @@ from tools import maint_structure_lib
 
 
 class MaintBuildStructureTests(unittest.TestCase):
+    def test_rebuild_structure_contents_removes_missing_series(self):
+        structure = {
+            "contents-root": "contents",
+            "genres": {
+                "comic": {
+                    "name": "漫画",
+                    "path": "comic",
+                    "00001": {
+                        "path": "comic/exists",
+                        "name": "Exists",
+                        "series": "Exists",
+                        "main-person": "",
+                        "persons": [],
+                        "labels": [],
+                        "note": "",
+                        "contents": [],
+                        "exturl": [],
+                    },
+                    "00002": {
+                        "path": "comic/missing",
+                        "name": "Missing",
+                        "series": "Missing",
+                        "main-person": "",
+                        "persons": [],
+                        "labels": [],
+                        "note": "",
+                        "contents": [],
+                        "exturl": [],
+                    },
+                }
+            }
+        }
+
+        with tempfile.TemporaryDirectory() as tmp:
+            contents_dir = Path(tmp) / "contents"
+            (contents_dir / "comic" / "exists").mkdir(parents=True)
+
+            with patch.object(maint_build_structure, "CONTENTS_DIR", str(contents_dir)), patch.object(
+                maint_build_structure, "generate_contents_entries", return_value=[]
+            ):
+                updated, changed = maint_build_structure.rebuild_structure_contents(structure)
+
+        comic_genre = updated["genres"]["comic"]
+        self.assertIn("00001", comic_genre)
+        self.assertNotIn("00002", comic_genre)
+        removed = [item for item in changed if item.get("removed")]
+        self.assertEqual(len(removed), 1)
+        self.assertEqual(removed[0]["series"], "00002")
+
     def test_rebuild_structure_contents_generates_direct_children(self):
         structure = {
             "contents-root": "contents",
@@ -44,7 +93,9 @@ class MaintBuildStructureTests(unittest.TestCase):
             (series_dir / "book03_pdf" / "cover.jpg").parent.mkdir(parents=True)
             (series_dir / "book03_pdf" / "cover.jpg").write_bytes(b"x")
 
-            with patch.object(maint_build_structure, "generate_contents_entries") as mock_generate:
+            with patch.object(maint_build_structure, "CONTENTS_DIR", str(contents_dir)), patch.object(
+                maint_build_structure, "generate_contents_entries"
+            ) as mock_generate:
                 mock_generate.return_value = [
                     {"path": "photo/alpha/book01", "cover": "thumbnail/photo/alpha/book01/cover.jpg", "name": "book01", "note": ""},
                     {"path": "photo/alpha/book02", "cover": "", "name": "book02", "note": ""},

@@ -2198,15 +2198,18 @@ async function toggleFullscreen() {
 function setupSearch() {
   const searchInput = document.getElementById('searchInput');
   if (!searchInput) return;
+  searchInput.placeholder = Search.getSearchPlaceholder(siteStructure, currentGenre, true);
 
-  searchInput.addEventListener('input', (e) => {
-    const query = e.target.value;
-    if (query.trim().length > 0) {
-      window.location.href = 'index.html';
-    }
-  });
+  const navigateToSearch = () => {
+    const query = searchInput.value.trim();
+    if (!query) return;
+    window.location.href = 'index.html?genre=' + encodeURIComponent(currentGenre) + '&q=' + encodeURIComponent(query);
+  };
 
   searchInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      navigateToSearch();
+    }
     if (e.key === 'Escape') {
       searchInput.value = '';
     }

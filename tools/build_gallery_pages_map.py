@@ -1,65 +1,54 @@
-"""Compatibility wrapper for legacy maintenance flow.
-
-This script keeps the old entry point but delegates work to the split
-maintenance tools introduced for the new structure.json schema.
-"""
+"""Compatibility wrapper for the full maintenance pipeline."""
 
 from __future__ import annotations
 
 import argparse
 
 try:
-    from .maint_build_gallery_pages import (
-        GALLERY_PAGES_PATH,
-        build_gallery_pages_map,
-        load_existing_gallery_pages_map,
-        select_gallery_paths_for_diff,
-        write_gallery_pages_js,
-    )
-    from .maint_build_structure import rebuild_structure_contents
+    from .build_site_config import main as build_site_config_main
+    from .maint_build_gallery_pages import main as build_gallery_pages_main
+    from .maint_build_gallery_thumbnails import main as build_gallery_thumbnails_main
+    from .maint_build_structure import main as build_structure_main
     from .maint_build_structure_js import main as build_structure_js_main
-    from .maint_structure_lib import STRUCTURE_JSON_PATH, load_structure, save_structure
-    from .maint_sync_history import PHOTO_DIR, HISTORY_PATH, sync_history
+    from .maint_extract_archives import main as extract_archives_main
+    from .maint_refresh_covers import main as refresh_covers_main
+    from .maint_sync_history import main as sync_history_main
 except ImportError:
-    from maint_build_gallery_pages import (
-        GALLERY_PAGES_PATH,
-        build_gallery_pages_map,
-        load_existing_gallery_pages_map,
-        select_gallery_paths_for_diff,
-        write_gallery_pages_js,
-    )
-    from maint_build_structure import rebuild_structure_contents
+    from build_site_config import main as build_site_config_main
+    from maint_build_gallery_pages import main as build_gallery_pages_main
+    from maint_build_gallery_thumbnails import main as build_gallery_thumbnails_main
+    from maint_build_structure import main as build_structure_main
     from maint_build_structure_js import main as build_structure_js_main
-    from maint_structure_lib import STRUCTURE_JSON_PATH, load_structure, save_structure
-    from maint_sync_history import PHOTO_DIR, HISTORY_PATH, sync_history
+    from maint_extract_archives import main as extract_archives_main
+    from maint_refresh_covers import main as refresh_covers_main
+    from maint_sync_history import main as sync_history_main
 
 
 def parse_args(argv=None):
-    parser = argparse.ArgumentParser(description='Generate derived JS files from structure.json')
-    parser.add_argument('--diff', action='store_true', help='Rebuild only galleries matching history.txt entries')
+    parser = argparse.ArgumentParser(description='Run the full maintenance pipeline')
+    parser.add_argument('--diff', action='store_true', help='Run diff mode for gallery thumbnails and gallery-pages')
     return parser.parse_args(argv)
 
 
 def main(argv=None) -> int:
     args = parse_args(argv)
-    structure = load_structure(STRUCTURE_JSON_PATH)
+    diff_args = ['--diff'] if args.diff else []
 
-    updated_structure, changed = rebuild_structure_contents(structure)
-    save_structure(updated_structure)
-    if changed:
-        print(f'Updated structure.json contents for {len(changed)} series')
+    steps = [
+        (build_structure_main, ['--sync']),
+        (extract_archives_main, []),
+        (build_gallery_thumbnails_main, diff_args),
+        (refresh_covers_main, []),
+        (build_structure_js_main, []),
+        (build_gallery_pages_main, diff_args),
+        (build_site_config_main, []),
+        (sync_history_main, []),
+    ]
 
-    build_structure_js_main()
-
-    result, metadata = build_gallery_pages_map(updated_structure, diff=args.diff)
-    write_gallery_pages_js(result)
-    print(f'Generated {GALLERY_PAGES_PATH}')
-    print(f"Galleries: {metadata['gallery_count']}, pages: {metadata['page_count']}")
-    print(f"Gallery thumbnails: generated={metadata['generated']}, reused={metadata['reused']}")
-
-    new_dirs = sync_history(PHOTO_DIR, HISTORY_PATH)
-    if new_dirs:
-        print(f'Recorded {len(new_dirs)} new photo directories to history.txt (next: block)')
+    for func, step_args in steps:
+        rc = func(step_args) if step_args else func()
+        if rc:
+            return rc
     return 0
 
 

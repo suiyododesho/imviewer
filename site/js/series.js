@@ -4,7 +4,7 @@
  */
 
 const Series = (() => {
-  const GENRE_META_KEYS = new Set(['name', 'path', 'note', 'labels', 'class', 'classname', 'browse']);
+  const GENRE_META_KEYS = new Set(['name', 'path', 'note', 'labels', 'class', 'classname', 'browse', 'searchkey', 'searchkeyname', 'entries']);
   const UNCATEGORIZED_SERIES = '未分類';
 
   // ---- Data access ----
@@ -18,12 +18,24 @@ const Series = (() => {
     return (genres[genreKey] && genres[genreKey].name) || genreKey;
   }
 
+  function getGenreEntriesMap(genre) {
+    if (!genre || typeof genre !== 'object') return {};
+
+    if (genre.entries && typeof genre.entries === 'object' && !Array.isArray(genre.entries)) {
+      return genre.entries;
+    }
+
+    return genre;
+  }
+
   function getSeriesEntries(structure, genreKey) {
     const genres = getGenres(structure);
     const genre = genres[genreKey];
     if (!genre || typeof genre !== 'object') return {};
+
+    const source = getGenreEntriesMap(genre);
     const entries = {};
-    for (const [key, value] of Object.entries(genre)) {
+    for (const [key, value] of Object.entries(source)) {
       if (GENRE_META_KEYS.has(key)) continue;
       if (!value || typeof value !== 'object') continue;
       entries[key] = value;
@@ -35,7 +47,8 @@ const Series = (() => {
     const result = [];
     for (const [genreKey, genreData] of Object.entries(getGenres(structure))) {
       if (!genreData || typeof genreData !== 'object') continue;
-      for (const [seriesKey, seriesData] of Object.entries(genreData)) {
+      const source = getGenreEntriesMap(genreData);
+      for (const [seriesKey, seriesData] of Object.entries(source)) {
         if (GENRE_META_KEYS.has(seriesKey)) continue;
         if (!seriesData || typeof seriesData !== 'object') continue;
         result.push({ genreKey, seriesKey, data: seriesData });
@@ -48,7 +61,9 @@ const Series = (() => {
     const genres = getGenres(structure);
     const genre = genres[genreKey];
     if (!genre) return null;
-    return genre[seriesKey] || null;
+
+    const entries = getGenreEntriesMap(genre);
+    return entries[seriesKey] || null;
   }
 
   function getSeriesName(entryData) {
@@ -116,6 +131,32 @@ const Series = (() => {
         unknownLabel,
       },
     };
+  }
+
+  function getGenreSearchConfig(structure, genreKey) {
+    const genres = getGenres(structure);
+    const genre = genres[genreKey];
+    if (!genre || typeof genre !== 'object') {
+      return {
+        keys: [],
+        names: [],
+      };
+    }
+
+    const keys = Array.isArray(genre.searchkey)
+      ? genre.searchkey
+        .filter((key) => typeof key === 'string')
+        .map((key) => key.trim())
+        .filter(Boolean)
+      : [];
+
+    const namesRaw = Array.isArray(genre.searchkeyname) ? genre.searchkeyname : [];
+    const names = keys.map((key, index) => {
+      const name = namesRaw[index];
+      return (typeof name === 'string' && name.trim().length > 0) ? name.trim() : key;
+    });
+
+    return { keys, names };
   }
 
   function getEntryClassValues(entryData, classKey) {
@@ -282,6 +323,7 @@ const Series = (() => {
     getContentCount,
     getMainPerson,
     getGenreClassConfig,
+    getGenreSearchConfig,
     getEntryClassValues,
     getPersonList,
     buildGenreHref,

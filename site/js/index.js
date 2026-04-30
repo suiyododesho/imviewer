@@ -6,6 +6,7 @@
 let siteStructure = null;
 let siteConfig = null;
 let activeGenre = '';
+let isGenreExplicit = false;
 let viewMode = 'cards';
 let classBrowseMode = false;
 let classBrowseValue = '';
@@ -24,6 +25,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const params = new URLSearchParams(window.location.search);
     activeGenre = getRequestedGenre(params.get('genre'));
+    isGenreExplicit = !!(params.has('genre') && params.get('genre'));
     classBrowseMode = params.get('classBrowse') === '1';
     classBrowseValue = decodeURIComponent(params.get('classValue') || '').trim();
 
@@ -32,7 +34,7 @@ document.addEventListener('DOMContentLoaded', () => {
     updateBreadcrumbs();
     renderSeriesList();
     setupSearch();
-    handlePersonParam(params);
+    handleSearchParams(params);
   } catch (error) {
     console.error('Error initializing page:', error);
     showError('サイトの読み込みに失敗しました: ' + error.message);
@@ -460,14 +462,15 @@ function setupSearch() {
   const searchInput = document.getElementById('searchInput');
   if (!searchInput) return;
 
+  searchInput.placeholder = Search.getSearchPlaceholder(siteStructure, activeGenre, isGenreExplicit);
+
   searchInput.addEventListener('input', (e) => {
     const query = e.target.value.trim();
     if (query.length === 0) {
       showSeriesView();
       renderSeriesList();
     } else {
-      showSearchView();
-      renderSearchResults(Search.searchEntriesGroupedByGenre(siteStructure, query));
+      performSearch(query);
     }
   });
 
@@ -475,8 +478,7 @@ function setupSearch() {
     if (e.key === 'Enter') {
       const query = searchInput.value.trim();
       if (query.length > 0) {
-        showSearchView();
-        renderSearchResults(Search.searchEntriesGroupedByGenre(siteStructure, query));
+        performSearch(query);
       }
     }
     if (e.key === 'Escape') {
@@ -487,13 +489,31 @@ function setupSearch() {
   });
 }
 
-function handlePersonParam(params) {
+function handleSearchParams(params) {
+  const query = params.get('q');
+  if (query && query.trim()) {
+    const normalized = query.trim();
+    const searchInput = document.getElementById('searchInput');
+    if (searchInput) searchInput.value = normalized;
+    performSearch(normalized);
+    return;
+  }
+
   const person = params.get('person');
   if (!person) return;
   const searchInput = document.getElementById('searchInput');
   if (searchInput) searchInput.value = person;
+  performSearch(person, true);
+}
+
+function performSearch(query, exactMatch = false) {
   showSearchView();
-  renderSearchResults(Search.searchEntriesGroupedByGenre(siteStructure, person, true));
+  const result = Search.searchEntriesByConfiguredKeys(siteStructure, query, {
+    genreKey: activeGenre,
+    genreSpecified: isGenreExplicit,
+    exactMatch,
+  });
+  renderSearchResults(result);
 }
 
 function showSeriesView() {
@@ -507,52 +527,75 @@ function showSearchView() {
   document.getElementById('searchResults')?.classList.remove('hidden');
 }
 
-function renderSearchResults(genreGroups) {
+function renderSearchResults(searchResult) {
   const container = document.getElementById('searchResultsContent');
   if (!container) return;
   container.innerHTML = '';
 
-  if (genreGroups.length === 0) { showNoResults(); return; }
+  const facets = (searchResult && Array.isArray(searchResult.facets)) ? searchResult.facets : [];
+  if (facets.length === 0) { showNoResults(); return; }
   hideNoResults();
 
-  for (const { genreName, genreKey, entries } of genreGroups) {
+  const chips = document.createElement('div');
+  chips.className = 'persons-chips';
+  container.appendChild(chips);
+
+  const details = document.createElement('div');
+  details.id = 'searchFacetResults';
+  container.appendChild(details);
+
+  let activeButton = null;
+  for (const facet of facets) {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'person-chip';
+    button.textContent = `${facet.label}(${facet.hitCount})`;
+    button.addEventListener('click', () => {
+      if (activeButton) activeButton.classList.remove('is-active');
+      activeButton = button;
+      activeButton.classList.add('is-active');
+      renderFacetDetails(details, facet);
+    });
+    chips.appendChild(button);
+  }
+
+  const firstButton = chips.querySelector('.person-chip');
+  if (firstButton) firstButton.click();
+}
+
+function renderFacetDetails(container, facet) {
+  container.innerHTML = '';
+
+  for (const group of facet.valueGroups) {
     const section = document.createElement('div');
     section.className = 'search-series-section';
 
     const heading = document.createElement('h2');
     heading.className = 'search-series-heading';
-    heading.textContent = genreName;
+    heading.textContent = `${group.value} (${group.count})`;
     section.appendChild(heading);
 
-    for (const { seriesKey, data, matchedPerson } of entries) {
-      const block = document.createElement('div');
-      block.className = 'search-project-block';
+    const seriesItems = group.items.filter((item) => item.type === 'series');
+    const contentItems = group.items.filter((item) => item.type === 'content');
 
-      const labelEl = document.createElement('div');
-      labelEl.className = 'search-project-label';
-      const link = document.createElement('a');
-      link.href = Series.buildSeriesHref(genreKey, seriesKey);
-      link.textContent = data.name || seriesKey;
-      labelEl.appendChild(link);
-      if (matchedPerson) {
-        const span = document.createElement('span');
-        span.textContent = ' - ' + matchedPerson;
-        labelEl.appendChild(span);
+    if (seriesItems.length > 0) {
+      const grid = document.createElement('div');
+      grid.className = 'project-grid';
+      for (const item of seriesItems) {
+        grid.appendChild(createSeriesCard(item.genreKey, item.seriesKey, item.data));
       }
-      block.appendChild(labelEl);
+      section.appendChild(grid);
+    }
 
-      if (Array.isArray(data.exturl) && data.exturl.length > 0) {
-        block.appendChild(createExternalLinksBlock(data.exturl));
-      }
-
+    if (contentItems.length > 0) {
       const grid = document.createElement('div');
       grid.className = 'gallery-grid';
-      for (const content of (data.contents || [])) {
-        grid.appendChild(createContentItem(content, genreKey, seriesKey));
+      for (const item of contentItems) {
+        grid.appendChild(createContentItem(item.content, item.genreKey, item.seriesKey));
       }
-      block.appendChild(grid);
-      section.appendChild(block);
+      section.appendChild(grid);
     }
+
     container.appendChild(section);
   }
 }

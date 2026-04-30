@@ -113,7 +113,11 @@ function createContentCard(content) {
 
   const mainPersonDiv = document.createElement('div');
   mainPersonDiv.className = 'project-content-line';
-  mainPersonDiv.textContent = '人名(main): ' + (currentSeriesData['main-person'] || 'なし');
+  const { classKeys, classNames } = Series.getGenreClassConfig(siteStructure, currentGenre);
+  const primaryKey = classKeys[0] || 'main-person';
+  const primaryLabel = classNames[0] || '人物';
+  const primaryValue = Series.getEntryClassValues(currentSeriesData, primaryKey)[0] || Series.getMainPerson(currentSeriesData);
+  mainPersonDiv.textContent = primaryLabel + ': ' + (primaryValue || 'なし');
 
   const pageCountDiv = document.createElement('div');
   pageCountDiv.className = 'project-content-line';
@@ -239,10 +243,17 @@ function updateViewModeControls() {
 function setupSearch() {
   const searchInput = document.getElementById('searchInput');
   if (!searchInput) return;
+  searchInput.placeholder = Search.getSearchPlaceholder(siteStructure, currentGenre, true);
+
+  const navigateToSearch = () => {
+    const q = searchInput.value.trim();
+    if (!q) return;
+    window.location.href = 'index.html?genre=' + encodeURIComponent(currentGenre) + '&q=' + encodeURIComponent(q);
+  };
+
   searchInput.addEventListener('keydown', (e) => {
     if (e.key === 'Enter') {
-      const q = searchInput.value.trim();
-      if (q) window.location.href = 'index.html?person=' + encodeURIComponent(q);
+      navigateToSearch();
     }
     if (e.key === 'Escape') searchInput.value = '';
   });

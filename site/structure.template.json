@@ -10,19 +10,31 @@
       "classname": [
         "著者"
       ],
+      "searchkey": [
+        "main-person",
+        "series",
+        "persons"
+      ],
+      "searchkeyname": [
+        "著者",
+        "作品",
+        "製作人物"
+      ],
       "browse": {
         "leafType": "series"
       },
-      "00001": {
-        "path": "",
-        "name": "",
-        "series": "",
-        "main-person": "",
-        "persons": [],
-        "labels": [],
-        "note": "",
-        "contents": [],
-        "exturl": []
+      "entries": {
+        "00001": {
+          "path": "",
+          "name": "",
+          "series": "",
+          "main-person": "",
+          "persons": [],
+          "labels": [],
+          "note": "",
+          "contents": [],
+          "exturl": []
+        }
       }
     },
     "photo": {
@@ -34,19 +46,31 @@
       "classname": [
         "モデル"
       ],
+      "searchkey": [
+        "main-person",
+        "name",
+        "persons"
+      ],
+      "searchkeyname": [
+        "モデル",
+        "作品",
+        "製作人物"
+      ],
       "browse": {
         "leafType": "content"
       },
-      "00001": {
-        "path": "",
-        "name": "",
-        "series": "",
-        "main-person": "",
-        "persons": [],
-        "labels": [],
-        "note": "",
-        "contents": [],
-        "exturl": []
+      "entries": {
+        "00001": {
+          "path": "",
+          "name": "",
+          "series": "",
+          "main-person": "",
+          "persons": [],
+          "labels": [],
+          "note": "",
+          "contents": [],
+          "exturl": []
+        }
       }
     }
   }

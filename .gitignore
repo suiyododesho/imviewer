@@ -18,3 +18,5 @@ site/banner/*
 releases/*
 site/structure.json
 tools/bin/*
+site/js/gallery-pages.js
+site/js/structure.js

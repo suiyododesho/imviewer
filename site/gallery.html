@@ -201,6 +201,13 @@
       align-items: stretch;
       justify-content: center;
       gap: 0;
+      transform-origin: center center;
+      transition: transform 120ms ease-out;
+      will-change: transform;
+    }
+
+    .media-stage-content.is-spread.is-dragging {
+      transition: none;
     }
 
     .media-stage-pane {

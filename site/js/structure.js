@@ -29,11 +29,22 @@ window.siteStructure = {
         "leafType": "series"
       },
       "entries": {
-        "[フクダーダ] 許嫁協定": {
+        "00001": {
+          "path": "",
+          "name": "",
+          "series": "",
+          "main-person": "",
+          "persons": [],
+          "labels": [],
+          "note": "",
+          "contents": [],
+          "exturl": []
+        },
+        "[ふ][フクダーダ] 許嫁協定": {
           "path": "comic/[ふ][フクダーダ] 許嫁協定",
-          "name": "許嫁協定",
-          "series": "許嫁協定",
-          "main-person": "フクダーダ",
+          "name": "[ふ][フクダーダ] 許嫁協定",
+          "series": "",
+          "main-person": "",
           "persons": [],
           "labels": [],
           "note": "",
@@ -107,11 +118,11 @@ window.siteStructure = {
           ],
           "exturl": []
         },
-        "[福地カミオ] よわよわ先生": {
+        "[ふ][福地カミオ] よわよわ先生": {
           "path": "comic/[ふ][福地カミオ] よわよわ先生",
-          "name": "よわよわ先生",
-          "series": "よわよわ先生",
-          "main-person": "福地カミオ",
+          "name": "[ふ][福地カミオ] よわよわ先生",
+          "series": "",
+          "main-person": "",
           "persons": [],
           "labels": [],
           "note": "",
@@ -216,21 +227,34 @@ window.siteStructure = {
       ],
       "searchkey": [
         "main-person",
-        "name"
+        "name",
+        "persons"
       ],
       "searchkeyname": [
         "モデル",
-        "作品"
+        "作品",
+        "製作人物"
       ],
       "browse": {
         "leafType": "content"
       },
       "entries": {
-        "[うんぱい] uP": {
-          "path": "photo/[うんぱい][20220628] uP",
-          "name": "uP",
+        "00001": {
+          "path": "",
+          "name": "",
           "series": "",
-          "main-person": "うんぱい",
+          "main-person": "",
+          "persons": [],
+          "labels": [],
+          "note": "",
+          "contents": [],
+          "exturl": []
+        },
+        "[うんぱい][20220628] uP": {
+          "path": "photo/[うんぱい][20220628] uP",
+          "name": "[うんぱい][20220628] uP",
+          "series": "",
+          "main-person": "",
           "persons": [],
           "labels": [],
           "note": "",

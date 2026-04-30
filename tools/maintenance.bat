@@ -36,7 +36,7 @@ echo ========================================
 echo  structure.json maintenance tool
 echo ========================================
 echo 0: Help
-echo 1: Incremental build (sync + extract + covers + JS)
+echo 1: Incremental build (sync + extract + thumbnails + covers + JS)
 echo 2: Full rebuild
 echo 3: Sync structure.json from contents
 echo 4: Extract archive contents
@@ -70,7 +70,7 @@ goto :end
 :help
 echo.
 echo [Help]
-echo 1: Incremental build - sync structure.json, extract new archives, refresh covers, regenerate JS
+echo 1: Incremental build - sync structure.json, extract new archives, generate thumbnails, refresh covers, regenerate JS
 echo 2: Full rebuild - all steps including thumbnail generation and history sync
 echo 3: Sync structure.json from contents (add/remove series, rebuild content skeletons)
 echo 4: Extract PDF/CBZ/ZIP contents
@@ -88,6 +88,8 @@ echo [Incremental build]
 call :run_structure_sync
 if errorlevel 1 goto :end
 call :run_extract_archives
+if errorlevel 1 goto :end
+call :run_gallery_thumbnails
 if errorlevel 1 goto :end
 call :run_refresh_covers
 if errorlevel 1 goto :end

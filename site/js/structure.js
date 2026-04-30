@@ -69,6 +69,12 @@ window.siteStructure = {
               "note": ""
             },
             {
+              "path": "comic/[ふ][フクダーダ] 許嫁協定/[フクダーダ] 許嫁協定 第06巻",
+              "cover": "thumbnail/comic/[ふ][フクダーダ] 許嫁協定/[フクダーダ] 許嫁協定 第06巻/cover.jpg",
+              "name": "[フクダーダ] 許嫁協定 第06巻",
+              "note": ""
+            },
+            {
               "path": "comic/[ふ][フクダーダ] 許嫁協定/[フクダーダ] 許嫁協定 第07巻",
               "cover": "thumbnail/comic/[ふ][フクダーダ] 許嫁協定/[フクダーダ] 許嫁協定 第07巻/cover.jpg",
               "name": "[フクダーダ] 許嫁協定 第07巻",

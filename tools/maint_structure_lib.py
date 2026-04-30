@@ -17,7 +17,18 @@ THUMBNAIL_DIR = os.path.join(SITE_DIR, "thumbnail")
 STRUCTURE_JSON_PATH = os.path.join(SITE_DIR, "structure.json")
 STRUCTURE_JS_PATH = os.path.join(SITE_DIR, "js", "structure.js")
 
-GENRE_META_KEYS = {"name", "path", "note", "labels"}
+GENRE_META_KEYS = {
+    "name",
+    "path",
+    "note",
+    "labels",
+    "class",
+    "classname",
+    "browse",
+    "searchkey",
+    "searchkeyname",
+    "entries",
+}
 THUMBNAIL_DIR_SUFFIXES = (
     "_tn", "_pdf_tn", "_cbz_tn", "_zip_tn",  # legacy
     "_zip", "_rar", "_7z",  # legacy/current non-gallery generated caches
@@ -97,15 +108,30 @@ def set_genres_map(structure: dict, genres_map: OrderedDict[str, dict]) -> dict:
     return structure
 
 
+def get_series_entries_map(genre_data: dict) -> OrderedDict[str, dict]:
+    if not isinstance(genre_data, dict):
+        return OrderedDict()
+
+    explicit_entries = genre_data.get("entries")
+    if isinstance(explicit_entries, dict):
+        return OrderedDict(
+            (str(key), value)
+            for key, value in explicit_entries.items()
+            if isinstance(value, dict)
+        )
+
+    return OrderedDict(
+        (str(key), value)
+        for key, value in genre_data.items()
+        if key not in GENRE_META_KEYS and isinstance(value, dict)
+    )
+
+
 def iter_series_entries(structure: dict):
     for genre_key, genre_data in get_genres_map(structure).items():
         if not isinstance(genre_data, dict):
             continue
-        for series_key, series_data in genre_data.items():
-            if series_key in GENRE_META_KEYS:
-                continue
-            if not isinstance(series_data, dict):
-                continue
+        for series_key, series_data in get_series_entries_map(genre_data).items():
             yield genre_key, genre_data, series_key, series_data
 
 
@@ -118,6 +144,85 @@ def _content_display_name(rel_path: str) -> str:
     name = os.path.basename(norm_rel(rel_path).rstrip("/"))
     stem, ext = os.path.splitext(name)
     return stem if ext else name
+
+
+def _scan_series_children(series_root_abs: str) -> tuple[list[str], list[tuple[str, str]], bool]:
+    subdirs: list[str] = []
+    archive_files: list[tuple[str, str]] = []
+    has_direct_media = False
+
+    for child_name in sorted(os.listdir(series_root_abs), key=str.lower):
+        if child_name.startswith("."):
+            continue
+        if _looks_like_generated_thumbnail_dir(child_name):
+            continue
+
+        child_abs = os.path.join(series_root_abs, child_name)
+        if os.path.isdir(child_abs):
+            subdirs.append(child_name)
+            continue
+        if not os.path.isfile(child_abs):
+            continue
+
+        ext = os.path.splitext(child_name)[1].lower()
+        if ext in ARCHIVE_CONTENT_EXTENSIONS:
+            archive_files.append((child_name, ext.lstrip(".")))
+        elif ext in DIRECT_IMAGE_EXTENSIONS | DIRECT_VIDEO_EXTENSIONS:
+            has_direct_media = True
+
+    return subdirs, archive_files, has_direct_media
+
+
+def scan_contents_entries(series_root_rel: str) -> list[dict]:
+    normalized_root = norm_rel(series_root_rel)
+    if not normalized_root:
+        return []
+
+    series_root_abs = os.path.join(CONTENTS_DIR, normalized_root)
+    if not os.path.isdir(series_root_abs):
+        return []
+
+    subdirs, archive_files, has_direct_media = _scan_series_children(series_root_abs)
+
+    if not subdirs and not archive_files:
+        if has_direct_media:
+            return [{
+                "path": normalized_root,
+                "cover": "",
+                "name": _content_display_name(normalized_root),
+                "note": "",
+            }]
+        return []
+
+    # Skip archive files that already have an extracted directory sibling
+    # e.g., skip "foo.pdf" if "foo_pdf" directory exists
+    subdir_set = {s.lower() for s in subdirs}
+    filtered_archives = [
+        (child_name, archive_kind)
+        for child_name, archive_kind in archive_files
+        if f"{os.path.splitext(child_name)[0]}_{archive_kind}".lower() not in subdir_set
+    ]
+
+    entries: list[dict] = []
+    for child_name in subdirs:
+        child_rel = norm_rel(os.path.join(normalized_root, child_name))
+        entries.append({
+            "path": child_rel,
+            "cover": "",
+            "name": _content_display_name(child_rel),
+            "note": "",
+        })
+    for child_name, _archive_kind in filtered_archives:
+        child_rel = norm_rel(os.path.join(normalized_root, child_name))
+        entries.append({
+            "path": child_rel,
+            "cover": "",
+            "name": _content_display_name(child_rel),
+            "note": "",
+        })
+
+    entries.sort(key=lambda e: e["name"].lower())
+    return entries
 
 
 def _candidate_cover_paths_for_content(rel_path: str) -> list[str]:
@@ -184,43 +289,20 @@ def generate_contents_entries(series_root_rel: str) -> list[dict]:
     if not os.path.isdir(series_root_abs):
         return []
 
-    subdirs: list[str] = []
-    archive_files: list[tuple[str, str]] = []
-    has_direct_media = False
-
-    for child_name in sorted(os.listdir(series_root_abs), key=str.lower):
-        if child_name.startswith("."):
-            continue
-        if _looks_like_generated_thumbnail_dir(child_name):
-            continue
-        child_abs = os.path.join(series_root_abs, child_name)
-        if os.path.isdir(child_abs):
-            subdirs.append(child_name)
-        elif os.path.isfile(child_abs):
-            ext = os.path.splitext(child_name)[1].lower()
-            if ext == ".pdf":
-                archive_files.append((child_name, "pdf"))
-            elif ext == ".cbz":
-                archive_files.append((child_name, "cbz"))
-            elif ext in DIRECT_IMAGE_EXTENSIONS | DIRECT_VIDEO_EXTENSIONS:
-                has_direct_media = True
+    subdirs, archive_files, has_direct_media = _scan_series_children(series_root_abs)
 
     generated_archive_dirs: list[str] = []
     for archive_name, archive_kind in archive_files:
         archive_abs = os.path.join(series_root_abs, archive_name)
         archive_rel = norm_rel(os.path.join(normalized_root, archive_name))
+        target_rel = get_archive_content_dir_rel(archive_rel)
+        extract_kwargs = {"long_edge_px": CONTENT_LONG_EDGE_PX}
         if archive_kind == "pdf":
-            target_rel = get_pdf_content_dir_rel(archive_rel)
-            extract_kwargs = {"dpi": CONTENT_RENDER_DPI, "long_edge_px": CONTENT_LONG_EDGE_PX}
-            extractor = extract_pdf_pages_to_dir
-        else:
-            target_rel = get_cbz_content_dir_rel(archive_rel)
-            extract_kwargs = {"long_edge_px": CONTENT_LONG_EDGE_PX}
-            extractor = extract_cbz_pages_to_dir
+            extract_kwargs["dpi"] = CONTENT_RENDER_DPI
 
         target_abs = os.path.join(CONTENTS_DIR, target_rel)
         try:
-            extractor(archive_abs, target_abs, **extract_kwargs)
+            extract_archive_pages_to_dir(archive_abs, target_abs, archive_kind=archive_kind, **extract_kwargs)
         except Exception as exc:
             print(f"  [archive extract error] {archive_rel}: {exc}")
             continue
@@ -379,6 +461,29 @@ def get_cbz_content_dir_rel(cbz_rel: str) -> str:
     return f"{stem}_cbz"
 
 
+def get_zip_content_dir_rel(zip_rel: str) -> str:
+    """Return the relative path of the generated content directory for a ZIP file."""
+    stem = os.path.splitext(norm_rel(zip_rel))[0]
+    return f"{stem}_zip"
+
+
+def get_archive_content_dir_rel(archive_rel: str) -> str:
+    normalized = norm_rel(archive_rel)
+    stem, ext = os.path.splitext(normalized)
+    ext_name = ext.lstrip(".").lower()
+    if ext_name == "pdf":
+        return f"{stem}_pdf"
+    if ext_name == "cbz":
+        return f"{stem}_cbz"
+    if ext_name == "zip":
+        return f"{stem}_zip"
+    if ext_name == "rar":
+        return f"{stem}_rar"
+    if ext_name == "7z":
+        return f"{stem}_7z"
+    return normalized
+
+
 def resize_image_to_long_edge(image, long_edge_px: int = THUMBNAIL_LONG_EDGE_PX):
     """Resize PIL image so that its long edge becomes long_edge_px.
 
@@ -477,6 +582,25 @@ def extract_cbz_pages_to_dir(cbz_abs: str, thumb_dir_abs: str, long_edge_px: int
             output_paths.append(dst)
 
     return output_paths
+
+
+def extract_zip_pages_to_dir(zip_abs: str, thumb_dir_abs: str, long_edge_px: int | None = THUMBNAIL_LONG_EDGE_PX) -> list[str]:
+    return extract_cbz_pages_to_dir(zip_abs, thumb_dir_abs, long_edge_px=long_edge_px)
+
+
+def extract_archive_pages_to_dir(
+    archive_abs: str,
+    output_dir_abs: str,
+    archive_kind: str | None = None,
+    dpi: int = PDF_RENDER_DPI,
+    long_edge_px: int | None = THUMBNAIL_LONG_EDGE_PX,
+) -> list[str]:
+    kind = (archive_kind or os.path.splitext(archive_abs)[1].lstrip(".")).lower()
+    if kind == "pdf":
+        return extract_pdf_pages_to_dir(archive_abs, output_dir_abs, dpi=dpi, long_edge_px=long_edge_px)
+    if kind in {"cbz", "zip"}:
+        return extract_zip_pages_to_dir(archive_abs, output_dir_abs, long_edge_px=long_edge_px)
+    raise ValueError(f"Unsupported archive type: {kind}")
 
 
 def write_structure_js(structure: dict, path: str = STRUCTURE_JS_PATH) -> None:

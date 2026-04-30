@@ -5,12 +5,149 @@ from pathlib import Path
 from unittest.mock import patch
 
 from tools.history_manager import HistoryData
-from tools import maint_build_structure
+from tools import build_gallery_pages_map
 from tools import maint_build_gallery_pages
+from tools import maint_build_gallery_thumbnails
+from tools import maint_build_structure
+from tools import maint_extract_archives
+from tools import maint_refresh_covers
 from tools import maint_structure_lib
 
 
 class MaintBuildStructureTests(unittest.TestCase):
+    def test_scaffold_missing_series_adds_series_with_blank_metadata(self):
+        structure = {
+            "contents-root": "contents",
+            "genres": {
+                "photo": {
+                    "name": "写真集",
+                    "path": "photo",
+                    "entries": {
+                        "00001": {
+                            "path": "photo/alpha",
+                            "name": "Alpha",
+                            "series": "",
+                            "main-person": "",
+                            "persons": [],
+                            "labels": [],
+                            "note": "",
+                            "contents": [],
+                            "exturl": [],
+                        }
+                    },
+                }
+            }
+        }
+
+        with tempfile.TemporaryDirectory() as tmp:
+            contents_dir = Path(tmp) / "contents"
+            (contents_dir / "photo" / "alpha").mkdir(parents=True)
+            (contents_dir / "photo" / "beta").mkdir(parents=True)
+
+            generated_contents = [
+                {"path": "photo/beta/book01", "cover": "", "name": "book01", "note": "memo"}
+            ]
+            with patch.object(maint_build_structure, "CONTENTS_DIR", str(contents_dir)), patch.object(
+                maint_build_structure, "scan_contents_entries", return_value=generated_contents
+            ):
+                updated, added = maint_build_structure.scaffold_missing_series(structure)
+
+        scaffold = updated["genres"]["photo"]["entries"]["beta"]
+        self.assertEqual(scaffold["path"], "photo/beta")
+        self.assertEqual(scaffold["name"], "beta")
+        self.assertEqual(scaffold["series"], "")
+        self.assertEqual(scaffold["main-person"], "")
+        self.assertEqual(scaffold["persons"], [])
+        self.assertEqual(scaffold["labels"], [])
+        self.assertEqual(scaffold["exturl"], [])
+        self.assertEqual(scaffold["contents"], [
+            {"path": "photo/beta/book01", "cover": "", "name": "book01", "note": ""}
+        ])
+        self.assertEqual(added, [{"genre": "photo", "series": "beta", "path": "photo/beta", "count": 1}])
+
+    def test_find_unregistered_series_paths_detects_new_content_directories(self):
+        structure = {
+            "contents-root": "contents",
+            "genres": {
+                "photo": {
+                    "name": "写真集",
+                    "path": "photo",
+                    "entries": {
+                        "00001": {
+                            "path": "photo/alpha",
+                            "name": "Alpha",
+                            "series": "Alpha",
+                            "main-person": "",
+                            "persons": [],
+                            "labels": [],
+                            "note": "",
+                            "contents": [],
+                            "exturl": [],
+                        }
+                    },
+                }
+            }
+        }
+
+        with tempfile.TemporaryDirectory() as tmp:
+            contents_dir = Path(tmp) / "contents"
+            (contents_dir / "photo" / "alpha").mkdir(parents=True)
+            (contents_dir / "photo" / "beta").mkdir(parents=True)
+
+            with patch.object(maint_build_structure, "CONTENTS_DIR", str(contents_dir)):
+                missing = maint_build_structure.find_unregistered_series_paths(structure)
+
+        self.assertEqual(missing, [{"genre": "photo", "path": "photo/beta", "name": "beta"}])
+
+    def test_rebuild_structure_contents_removes_missing_series(self):
+        structure = {
+            "contents-root": "contents",
+            "genres": {
+                "comic": {
+                    "name": "漫画",
+                    "path": "comic",
+                    "00001": {
+                        "path": "comic/exists",
+                        "name": "Exists",
+                        "series": "Exists",
+                        "main-person": "",
+                        "persons": [],
+                        "labels": [],
+                        "note": "",
+                        "contents": [],
+                        "exturl": [],
+                    },
+                    "00002": {
+                        "path": "comic/missing",
+                        "name": "Missing",
+                        "series": "Missing",
+                        "main-person": "",
+                        "persons": [],
+                        "labels": [],
+                        "note": "",
+                        "contents": [],
+                        "exturl": [],
+                    },
+                }
+            }
+        }
+
+        with tempfile.TemporaryDirectory() as tmp:
+            contents_dir = Path(tmp) / "contents"
+            (contents_dir / "comic" / "exists").mkdir(parents=True)
+
+            with patch.object(maint_build_structure, "CONTENTS_DIR", str(contents_dir)), patch.object(
+                maint_build_structure, "scan_contents_entries", return_value=[]
+            ):
+                updated, changed = maint_build_structure.rebuild_structure_contents(structure)
+
+        comic_genre = updated["genres"]["comic"]
+        self.assertIn("00001", comic_genre)
+        self.assertNotIn("00002", comic_genre)
+        removed = [item for item in changed if item.get("removed")]
+        self.assertEqual(len(removed), 1)
+        self.assertEqual(removed[0]["series"], "00002")
+
     def test_rebuild_structure_contents_generates_direct_children(self):
         structure = {
             "contents-root": "contents",
@@ -44,11 +181,13 @@ class MaintBuildStructureTests(unittest.TestCase):
             (series_dir / "book03_pdf" / "cover.jpg").parent.mkdir(parents=True)
             (series_dir / "book03_pdf" / "cover.jpg").write_bytes(b"x")
 
-            with patch.object(maint_build_structure, "generate_contents_entries") as mock_generate:
-                mock_generate.return_value = [
-                    {"path": "photo/alpha/book01", "cover": "thumbnail/photo/alpha/book01/cover.jpg", "name": "book01", "note": ""},
+            with patch.object(maint_build_structure, "CONTENTS_DIR", str(contents_dir)), patch.object(
+                maint_build_structure, "scan_contents_entries"
+            ) as mock_scan:
+                mock_scan.return_value = [
+                    {"path": "photo/alpha/book01", "cover": "", "name": "book01", "note": ""},
                     {"path": "photo/alpha/book02", "cover": "", "name": "book02", "note": ""},
-                    {"path": "photo/alpha/book03.pdf", "cover": "thumbnail/photo/alpha/book03_pdf/cover.jpg", "name": "book03", "note": ""},
+                    {"path": "photo/alpha/book03.pdf", "cover": "", "name": "book03", "note": ""},
                 ]
                 updated, changed = maint_build_structure.rebuild_structure_contents(structure)
 
@@ -304,6 +443,159 @@ class MaintBuildStructureTests(unittest.TestCase):
         self.assertEqual(compact["t"], "thumbnail/photo/alpha/book01")
         self.assertEqual(compact["p"][0], ["i", "001.jpg"])
         self.assertEqual(compact["p"][1], ["v", "clip.mp4", 1, "clip", "mp4"])
+
+    def test_build_gallery_pages_map_main_runs_split_pipeline(self):
+        with (
+            patch.object(build_gallery_pages_map, "build_structure_main", return_value=0) as mock_structure,
+            patch.object(build_gallery_pages_map, "extract_archives_main", return_value=0) as mock_extract,
+            patch.object(build_gallery_pages_map, "build_gallery_thumbnails_main", return_value=0) as mock_thumbs,
+            patch.object(build_gallery_pages_map, "refresh_covers_main", return_value=0) as mock_covers,
+            patch.object(build_gallery_pages_map, "build_structure_js_main", return_value=0) as mock_structure_js,
+            patch.object(build_gallery_pages_map, "build_gallery_pages_main", return_value=0) as mock_gallery_pages,
+            patch.object(build_gallery_pages_map, "build_site_config_main", return_value=0) as mock_site_config,
+            patch.object(build_gallery_pages_map, "sync_history_main", return_value=0) as mock_history,
+        ):
+            rc = build_gallery_pages_map.main([])
+
+        self.assertEqual(rc, 0)
+        mock_structure.assert_called_once_with(["--sync"])
+        mock_extract.assert_called_once_with()
+        mock_thumbs.assert_called_once_with()
+        mock_covers.assert_called_once_with()
+        mock_structure_js.assert_called_once_with()
+        mock_gallery_pages.assert_called_once_with()
+        mock_site_config.assert_called_once_with()
+        mock_history.assert_called_once_with()
+
+    def test_main_add_missing_series_writes_scaffold_entries(self):
+        structure = {
+            "contents-root": "contents",
+            "genres": {
+                "photo": {
+                    "name": "写真集",
+                    "path": "photo",
+                    "entries": {}
+                }
+            }
+        }
+
+        with patch.object(maint_build_structure, "load_structure", return_value=structure), patch.object(
+            maint_build_structure, "scaffold_missing_series", return_value=(structure, [{"genre": "photo", "series": "beta", "path": "photo/beta", "count": 0}])
+        ) as mock_scaffold, patch.object(maint_build_structure, "save_structure") as mock_save:
+            rc = maint_build_structure.main(["--add-missing-series"])
+
+        self.assertEqual(rc, 0)
+        mock_scaffold.assert_called_once_with(structure, None)
+        mock_save.assert_called_once_with(structure)
+
+    def test_sync_structure_from_contents_adds_and_rebuilds(self):
+        structure = {
+            "contents-root": "contents",
+            "genres": {
+                "photo": {
+                    "name": "写真集",
+                    "path": "photo",
+                    "entries": {
+                        "alpha": {
+                            "path": "photo/alpha",
+                            "name": "alpha",
+                            "series": "",
+                            "main-person": "",
+                            "persons": [],
+                            "labels": [],
+                            "note": "",
+                            "contents": [{"path": "photo/alpha/old", "cover": "", "name": "old", "note": ""}],
+                            "exturl": [],
+                        }
+                    }
+                }
+            }
+        }
+
+        with tempfile.TemporaryDirectory() as tmp:
+            contents_dir = Path(tmp) / "contents"
+            (contents_dir / "photo" / "alpha").mkdir(parents=True)
+            (contents_dir / "photo" / "beta").mkdir(parents=True)
+
+            def _scan(series_path):
+                if series_path == "photo/alpha":
+                    return [{"path": "photo/alpha/book01", "cover": "", "name": "book01", "note": ""}]
+                if series_path == "photo/beta":
+                    return [{"path": "photo/beta/book02", "cover": "", "name": "book02", "note": ""}]
+                return []
+
+            with patch.object(maint_build_structure, "CONTENTS_DIR", str(contents_dir)), patch.object(
+                maint_build_structure, "scan_contents_entries", side_effect=_scan
+            ):
+                updated, changed = maint_build_structure.sync_structure_from_contents(structure)
+
+        self.assertIn("beta", updated["genres"]["photo"]["entries"])
+        self.assertEqual(updated["genres"]["photo"]["entries"]["alpha"]["contents"], [{"path": "photo/alpha/book01", "cover": "", "name": "book01", "note": ""}])
+        self.assertEqual(updated["genres"]["photo"]["entries"]["beta"]["contents"], [{"path": "photo/beta/book02", "cover": "", "name": "book02", "note": ""}])
+        self.assertEqual(len(changed), 2)
+
+    def test_refresh_content_covers_updates_structure_entries(self):
+        structure = {
+            "contents-root": "contents",
+            "genres": {
+                "photo": {
+                    "name": "写真集",
+                    "path": "photo",
+                    "entries": {
+                        "alpha": {
+                            "path": "photo/alpha",
+                            "name": "alpha",
+                            "series": "",
+                            "main-person": "",
+                            "persons": [],
+                            "labels": [],
+                            "note": "",
+                            "contents": [{"path": "photo/alpha/book01", "cover": "", "name": "book01", "note": ""}],
+                            "exturl": [],
+                        }
+                    }
+                }
+            }
+        }
+
+        updated, changed = maint_refresh_covers.refresh_content_covers(structure)
+        self.assertEqual(updated["genres"]["photo"]["entries"]["alpha"]["contents"][0]["cover"], "")
+        self.assertEqual(changed, [])
+
+        with patch.object(maint_refresh_covers, "find_cover_for_content", return_value="thumbnail/photo/alpha/book01/cover.jpg"):
+            updated, changed = maint_refresh_covers.refresh_content_covers(structure)
+
+        self.assertEqual(updated["genres"]["photo"]["entries"]["alpha"]["contents"][0]["cover"], "thumbnail/photo/alpha/book01/cover.jpg")
+        self.assertEqual(changed[0]["path"], "photo/alpha/book01")
+
+    def test_assign_gallery_thumbnail_refs_without_generation(self):
+        pages = [
+            {"type": "image", "image": "contents/photo/alpha/book01/001.jpg", "html": "contents/photo/alpha/book01"},
+            {"type": "image", "image": "contents/photo/alpha/book01/002.jpg", "html": "contents/photo/alpha/book01"},
+        ]
+
+        generated, reused = maint_build_gallery_pages.assign_gallery_thumbnail_refs("photo/alpha/book01", pages, generate_files=False)
+
+        self.assertEqual((generated, reused), (0, 0))
+        self.assertEqual(pages[0]["thumbnail"], "thumbnail/photo/alpha/book01/001.jpg")
+        self.assertEqual(pages[1]["thumbnail"], "thumbnail/photo/alpha/book01/002.jpg")
+
+    def test_extract_archives_supports_zip(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            contents_dir = Path(tmp) / "contents"
+            archive_path = contents_dir / "photo" / "alpha" / "book01.zip"
+            archive_path.parent.mkdir(parents=True)
+            archive_path.write_bytes(b"PK")
+
+            with patch.object(maint_extract_archives, "CONTENTS_DIR", str(contents_dir)), patch.object(
+                maint_extract_archives, "extract_archive_pages_to_dir", return_value=[]
+            ) as mock_extract:
+                result = maint_extract_archives.extract_archives(str(contents_dir))
+
+        self.assertEqual(result["unsupported"], [])
+        self.assertEqual(result["skipped"], [])
+        self.assertEqual(result["extracted"], ["photo/alpha/book01_zip"])
+        mock_extract.assert_called_once()
 
 
 if __name__ == "__main__":

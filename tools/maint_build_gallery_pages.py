@@ -17,7 +17,7 @@ try:
         CONTENTS_DIR, DIRECT_IMAGE_EXTENSIONS,
         DIRECT_VIDEO_EXTENSIONS, SITE_DIR, STRUCTURE_JSON_PATH, THUMBNAIL_LONG_EDGE_PX,
         collect_gallery_file_paths_for_content, collect_gallery_html_paths_for_content,
-        get_cbz_content_dir_rel, get_pdf_content_dir_rel,
+        get_archive_content_dir_rel, get_cbz_content_dir_rel, get_pdf_content_dir_rel,
         iter_content_entries, load_structure, norm_rel, resize_image_to_long_edge,
     )
 except ImportError:
@@ -26,7 +26,7 @@ except ImportError:
         CONTENTS_DIR, DIRECT_IMAGE_EXTENSIONS,
         DIRECT_VIDEO_EXTENSIONS, SITE_DIR, STRUCTURE_JSON_PATH, THUMBNAIL_LONG_EDGE_PX,
         collect_gallery_file_paths_for_content, collect_gallery_html_paths_for_content,
-        get_cbz_content_dir_rel, get_pdf_content_dir_rel,
+        get_archive_content_dir_rel, get_cbz_content_dir_rel, get_pdf_content_dir_rel,
         iter_content_entries, load_structure, norm_rel, resize_image_to_long_edge,
     )
 
@@ -373,6 +373,27 @@ def ensure_gallery_prebuilt_thumbnails(gallery_path, pages):
     return generated, reused
 
 
+def assign_gallery_thumbnail_refs(gallery_path, pages, generate_files=False):
+    if generate_files:
+        return ensure_gallery_prebuilt_thumbnails(gallery_path, pages)
+
+    thumb_dir_rel = _get_gallery_thumbnail_dir_rel(gallery_path)
+    if not thumb_dir_rel:
+        for page in pages:
+            if page.get('type') == 'image' and page.get('image'):
+                page['thumbnail'] = page.get('image')
+        return 0, 0
+
+    thumb_dir_rel = norm_rel(thumb_dir_rel)
+    thumb_index = 0
+    for page in pages:
+        if page.get('type') != 'image' or not page.get('image'):
+            continue
+        thumb_index += 1
+        page['thumbnail'] = norm_rel(os.path.join(thumb_dir_rel, f'{thumb_index:03d}.jpg'))
+    return 0, 0
+
+
 def resolve_gallery_source_path(gallery_path: str) -> str:
     """Return a concrete gallery source path.
 
@@ -381,11 +402,8 @@ def resolve_gallery_source_path(gallery_path: str) -> str:
     """
     normalized = norm_rel(gallery_path)
     ext = os.path.splitext(normalized)[1].lower()
-    if ext == '.pdf':
-        mapped = get_pdf_content_dir_rel(normalized)
-        return mapped if os.path.isdir(os.path.join(CONTENTS_DIR, mapped)) else normalized
-    if ext == '.cbz':
-        mapped = get_cbz_content_dir_rel(normalized)
+    if ext in {'.pdf', '.cbz', '.zip', '.rar', '.7z'}:
+        mapped = get_archive_content_dir_rel(normalized)
         return mapped if os.path.isdir(os.path.join(CONTENTS_DIR, mapped)) else normalized
     return normalized
 
@@ -502,7 +520,7 @@ def write_gallery_pages_js(result):
         out.write(';\n')
 
 
-def build_gallery_pages_map(structure: dict, diff: bool = False) -> tuple[dict, dict]:
+def build_gallery_pages_map(structure: dict, diff: bool = False, generate_thumbnails: bool = False) -> tuple[dict, dict]:
     all_gallery_paths = list(iter_gallery_paths(structure))
     target_gallery_paths = list(all_gallery_paths)
     result = {}
@@ -528,7 +546,7 @@ def build_gallery_pages_map(structure: dict, diff: bool = False) -> tuple[dict, 
         if not pages:
             result.pop(gallery_path, None)
             continue
-        generated_count, reused_count = ensure_gallery_prebuilt_thumbnails(source_gallery_path, pages)
+        generated_count, reused_count = assign_gallery_thumbnail_refs(source_gallery_path, pages, generate_files=generate_thumbnails)
         thumb_generated += generated_count
         thumb_reused += reused_count
         result[gallery_path] = compact_gallery_pages(source_gallery_path, pages)
@@ -538,6 +556,37 @@ def build_gallery_pages_map(structure: dict, diff: bool = False) -> tuple[dict, 
     metadata["gallery_count"] = len(result)
     metadata["page_count"] = sum(count_gallery_pages_entry(v) for v in result.values())
     return result, metadata
+
+
+def generate_gallery_thumbnails(structure: dict, diff: bool = False) -> dict:
+    all_gallery_paths = list(iter_gallery_paths(structure))
+    target_gallery_paths = list(all_gallery_paths)
+    metadata = {"incremental_mode": False, "generated": 0, "reused": 0}
+
+    if diff:
+        history_data = parse_history(HISTORY_PATH)
+        history_targets = list(history_data.next_dirs) + list(history_data.next_force_dirs)
+        selected = select_gallery_paths_for_diff(all_gallery_paths, history_targets)
+        target_gallery_paths = selected
+        metadata["incremental_mode"] = True
+
+    thumb_generated = 0
+    thumb_reused = 0
+    processed = 0
+    for gallery_path in target_gallery_paths:
+        source_gallery_path = resolve_gallery_source_path(gallery_path)
+        pages = collect_gallery_pages_for_path(source_gallery_path)
+        if not pages:
+            continue
+        generated_count, reused_count = assign_gallery_thumbnail_refs(source_gallery_path, pages, generate_files=True)
+        thumb_generated += generated_count
+        thumb_reused += reused_count
+        processed += 1
+
+    metadata["generated"] = thumb_generated
+    metadata["reused"] = thumb_reused
+    metadata["gallery_count"] = processed
+    return metadata
 
 
 def parse_args(argv=None):
@@ -551,7 +600,7 @@ def main(argv=None) -> int:
     args = parse_args(argv)
     diff_mode = args.diff and not args.full
     structure = load_structure(STRUCTURE_JSON_PATH)
-    result, metadata = build_gallery_pages_map(structure, diff=diff_mode)
+    result, metadata = build_gallery_pages_map(structure, diff=diff_mode, generate_thumbnails=False)
     write_gallery_pages_js(result)
     print(f"Generated {GALLERY_PAGES_PATH}")
     print(f"Galleries: {metadata['gallery_count']}, pages: {metadata['page_count']}")

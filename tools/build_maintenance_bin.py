@@ -40,10 +40,14 @@ def main() -> int:
         "build_exe": {
             "build_exe": str(BIN_DIR),
             "includes": [
+                "build_site_config",
                 "history_manager",
                 "maint_build_gallery_pages",
+                "maint_build_gallery_thumbnails",
                 "maint_build_structure",
                 "maint_build_structure_js",
+                "maint_extract_archives",
+                "maint_refresh_covers",
                 "maint_structure_lib",
                 "maint_sync_history",
             ],
@@ -53,12 +57,36 @@ def main() -> int:
 
     executables = [
         Executable(
-            script=str(TOOLS_DIR / "generate_thumbnails.py"),
-            target_name="generate_thumbnails.exe",
+            script=str(TOOLS_DIR / "maint_build_structure.py"),
+            target_name="maint_build_structure.exe",
+        ),
+        Executable(
+            script=str(TOOLS_DIR / "maint_extract_archives.py"),
+            target_name="maint_extract_archives.exe",
+        ),
+        Executable(
+            script=str(TOOLS_DIR / "maint_build_gallery_thumbnails.py"),
+            target_name="maint_build_gallery_thumbnails.exe",
+        ),
+        Executable(
+            script=str(TOOLS_DIR / "maint_refresh_covers.py"),
+            target_name="maint_refresh_covers.exe",
+        ),
+        Executable(
+            script=str(TOOLS_DIR / "maint_build_structure_js.py"),
+            target_name="maint_build_structure_js.exe",
+        ),
+        Executable(
+            script=str(TOOLS_DIR / "maint_build_gallery_pages.py"),
+            target_name="maint_build_gallery_pages.exe",
         ),
         Executable(
             script=str(TOOLS_DIR / "build_site_config.py"),
             target_name="build_site_config.exe",
+        ),
+        Executable(
+            script=str(TOOLS_DIR / "maint_sync_history.py"),
+            target_name="maint_sync_history.exe",
         ),
         Executable(
             script=str(TOOLS_DIR / "build_gallery_pages_map.py"),
@@ -68,7 +96,7 @@ def main() -> int:
 
     setup(
         name="maintenance-tools",
-        version="1.0.0",
+        version="1.1.0",
         description="Frozen maintenance tools",
         options=options,
         executables=executables,

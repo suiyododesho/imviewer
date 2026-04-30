@@ -4,31 +4,73 @@
     "comic": {
       "name": "漫画",
       "path": "comic",
-      "00001": {
-        "path": "",
-        "name": "",
-        "series": "",
-        "main-person": "",
-        "persons": [],
-        "labels": [],
-        "note": "",
-        "contents": [],
-        "exturl": []
+      "class": [
+        "main-person"
+      ],
+      "classname": [
+        "著者"
+      ],
+      "searchkey": [
+        "main-person",
+        "series",
+        "persons"
+      ],
+      "searchkeyname": [
+        "著者",
+        "作品",
+        "製作人物"
+      ],
+      "browse": {
+        "leafType": "series"
+      },
+      "entries": {
+        "00001": {
+          "path": "",
+          "name": "",
+          "series": "",
+          "main-person": "",
+          "persons": [],
+          "labels": [],
+          "note": "",
+          "contents": [],
+          "exturl": []
+        }
       }
     },
     "photo": {
       "name": "写真集",
       "path": "photo",
-      "00001": {
-        "path": "",
-        "name": "",
-        "series": "",
-        "main-person": "",
-        "persons": [],
-        "labels": [],
-        "note": "",
-        "contents": [],
-        "exturl": []
+      "class": [
+        "main-person"
+      ],
+      "classname": [
+        "モデル"
+      ],
+      "searchkey": [
+        "main-person",
+        "name",
+        "persons"
+      ],
+      "searchkeyname": [
+        "モデル",
+        "作品",
+        "製作人物"
+      ],
+      "browse": {
+        "leafType": "content"
+      },
+      "entries": {
+        "00001": {
+          "path": "",
+          "name": "",
+          "series": "",
+          "main-person": "",
+          "persons": [],
+          "labels": [],
+          "note": "",
+          "contents": [],
+          "exturl": []
+        }
       }
     }
   }

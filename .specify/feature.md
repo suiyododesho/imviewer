@@ -41,16 +41,17 @@ toolにて、アップデート作業を実行するツールを追加する。g
 
 ### 【予定】F04:toolにて、コンテンツ追加作業をローカルマシンで実行し、サーバーにアップロードするツールを追加する
 
-toolにて、コンテンツ追加作業をローカルマシンで実行し、サーバーにアップロードするツールを追加する。現在の運用ではサーバマシンのストレージをマウントして直接コンテンツ追加作業を行っているが、速度が遅いことが課題となっている。ローカルマシンでコンテンツ追加作業を実行し、サーバーにアップロードする方法であれば、ローカルマシンの高速なストレージを使用できるため、速度の改善が期待できる。
+toolにて、コンテンツ追加作業をローカルマシンで実行し、サーバーにアップロードするツールを追加する。現在の運用ではサーバマシンのストレージをマウントして直接コンテンツ追加作業を行っているが、サーバのディレクトリ越しに処理を行うために速度が遅いことが課題となっている。ローカルマシンでコンテンツ追加作業を実行し、サーバーにアップロードする方法であれば、ローカルマシンの高速なストレージを使用できるため、速度の改善が期待できる。
 
 本ツールのディレクトリ構成イメージ
 
 ```
-tool/   # この環境のtoolディレクトリ
+tools/   # この環境のtoolsディレクトリ
 ├── content_add/    # コンテンツ追加ツールのディレクトリ
-│   ├──workspace/   # コンテンツ追加のワークスペース（※）
-│   │   ├── content_add.bat  # コンテンツ追加ツールのスクリプトファイル
-│   │   ├── contents/         # 追加対象のコンテンツディレクトリ（運用先のsite/contentsの構造と同一にする）
+│   ├── workspace/   # コンテンツ追加のワークスペース（※）
+│   │   ├── content_add.bat          # コンテンツ追加ツールのスクリプトファイル
+│   │   ├── content_add_config.json  # 設定ファイル（サーバーパスなど）
+│   │   ├── contents/                # 追加対象のコンテンツ（運用先のsite/contentsの構造と同一）
 ├── maint_*.py      # maint_*.pyは、この環境で実装済みのmaintenanceツールのスクリプトファイル
 ├── maintenance_config.json
 ```
@@ -60,9 +61,66 @@ tool/   # この環境のtoolディレクトリ
 workspaceディレクトリは、コンテンツ追加作業を実行するためのワークスペースである。
 本プロジェクトを利用して運用するシステムが複数あり、そのシステムごとにコンテンツ追加作業をできるようにするため。本プロジェクトでは`content_add`というディレクトリ名でツールを開発し、実際に利用するときは`workspace`を複製＆名前変更して使用するイメージ。
 
-当然、複製して使用するディレクトリはgit管理の対象外とする必要があるため、複製して使用するディレクトリ空間には`.gitignore`に追加すること。ディレクトリ名が任意であるため、`.gitignore`には、`tool/content_add/*/`のように、ツールディレクトリ配下の任意のディレクトリをgit管理の対象外とする記述を追加すること。
+当然、複製して使用するディレクトリはgit管理の対象外とする必要があるため、複製して使用するディレクトリ空間には`.gitignore`に追加すること。ディレクトリ名が任意であるため、`.gitignore`には、`tools/content_add/*/`のように、ツールディレクトリ配下の任意のディレクトリをgit管理の対象外とする記述を追加すること。
 
-追加処理は既存のmaintenanceツールの処理を流用する。したがって、`contents`ディレクトリは運用中のwebシステムの`site/contents`の構造と同一にする必要がある。追加処理の実装にあたっては、既存のmaintenanceツールの処理を参考にしつつ、必要な部分を改修して実装すること。コードクローンを行わないようにする。
+追加処理は既存のmaintenanceツールの処理を流用する。したがって、`contents`ディレクトリは運用中のwebシステムの`site/contents`の構造と同一にする必要がある。運用中のwebシステム上でのコンテンツ追加作業をローカルマシンで実行させるための機能だから、運用中のwebシステム上の`contents`ディレクトリを模擬する必要がある。追加処理の実装にあたっては、既存のmaintenanceツールの処理を参考にしつつ、必要な部分を改修して実装すること。コードクローンを行わないようにする。
+
+#### workspaceの詳細ディレクトリ構成
+
+```
+workspace/
+├── content_add.bat          # コンテンツ追加ツールのメインスクリプト
+├── content_add_config.json  # 設定ファイル（サーバーパスなど）
+├── contents/                # 追加対象のコンテンツ（アーカイブファイルを配置）
+│   └── （例）comic/[著者名] タイトル/第01巻.zip  ← site/contents と同じ構造
+├── structure.json           # サーバーからfetchして作業開始、処理後は更新済みになる
+└── thumbnail/               # ローカルで生成したサムネイル（処理中に生成）
+```
+
+#### content_add_config.json の仕様
+
+workspaceディレクトリに配置する設定ファイル。サーバー（展開先）のディレクトリパスなどを記述する。
+
+```json
+{
+  "server": {
+    "site_dir": "Z:\\path\\to\\server\\site"
+  }
+}
+```
+
+- `server.site_dir`：展開先のサーバー上の`site/`ディレクトリへの絶対パス（UNCパスや割り当てドライブレター）
+
+#### content_add.bat の処理フロー
+
+1. **Fetch フェーズ**：`server.site_dir/structure.json` を workspace にコピーする（robocopy使用）。
+2. **処理フェーズ**：workspaceをルートとして、既存のmaintenance処理と同等の処理を実行する。
+   - structure.json の同期（`maint_build_structure.py`）
+   - アーカイブ展開（`maint_extract_archives.py`）
+   - サムネイル生成（`maint_build_gallery_thumbnails.py`）
+   - カバー更新（`maint_refresh_covers.py`）
+   - JS生成（`maint_build_structure_js.py`、`maint_build_gallery_pages.py`、`build_site_config.py`）
+3. **Uploadフェーズ**：robocopyを使用して、生成物をサーバー側にコピーする。コピー対象は以下の通り。
+   - `workspace/contents/` → `server.site_dir/contents/`（差分コピー・削除なし）
+   - `workspace/thumbnail/` → `server.site_dir/thumbnail/`（差分コピー・削除なし）
+   - `workspace/structure.json` → `server.site_dir/structure.json`
+   - `workspace/js/structure.js` → `server.site_dir/js/structure.js`
+   - `workspace/js/gallery-pages.js` → `server.site_dir/js/gallery-pages.js`
+   - `workspace/js/site-config.js` → `server.site_dir/js/site-config.js`
+
+#### 技術的対応方針：maint_*.py のパス解決
+
+既存の`maint_structure_lib.py`はROOTを`__file__`から算出するため、そのままでは`site/contents/`ではなくworkspaceを対象にできない。
+
+対応方針：各maint_*.pyスクリプト（および`maint_structure_lib.py`）に`--root`引数を追加し、ROOTを外部から指定できるようにする。`content_add.bat`はworkspaceの親ディレクトリをROOTとして渡す。
+
+workspaceディレクトリ構成は`{ROOT}/site/contents/`の形に合わせるため、workspace内に`site/`相当のディレクトリ構造を作成する必要がある。ただし、workspaceを浅くシンプルに保つため、workspace直下に`contents/`や`thumbnail/`を置くのではなく、`workspace/`自体を`site/`相当として扱う設計とする。
+
+つまり：
+- `--root` に渡す値 = `workspace/` の親ディレクトリ（`content_add/`のパス）
+- maint_*.py から見た `{ROOT}/site/` = `content_add/workspace/`
+
+これにより、`contents/`、`thumbnail/`、`structure.json`、`js/`などがworkspace直下に自然に収まる。
 
 ## 改善要件(Modification)
 

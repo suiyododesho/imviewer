@@ -18,6 +18,8 @@ set "CONFIG_SCRIPT=%ROOT_DIR%\tools\build_site_config.py"
 set "HISTORY_SCRIPT=%ROOT_DIR%\tools\maint_sync_history.py"
 set "FULL_SCRIPT=%ROOT_DIR%\tools\build_gallery_pages_map.py"
 set "BUILD_BIN_SCRIPT=%ROOT_DIR%\tools\build_maintenance_bin.py"
+set "METADATA_SCRIPT=%ROOT_DIR%\tools\maint_metadata.py"
+set "METADATA_CSV=%ROOT_DIR%\tools\metadata.csv"
 
 set "STRUCTURE_EXE=%BIN_DIR%\maint_build_structure.exe"
 set "EXTRACT_EXE=%BIN_DIR%\maint_extract_archives.exe"
@@ -46,6 +48,8 @@ echo 7: Generate JS files (structure.js + gallery-pages.js + site-config.js)
 echo 8: Sync history.txt
 echo 9: Diff rebuild (gallery thumbnails + gallery-pages)
 echo 10: Build bin executables (cx_Freeze)
+echo 11: Export metadata to CSV (tools/metadata.csv)
+echo 12: Apply metadata from CSV to structure.json
 echo Other or empty input: Exit
 echo.
 
@@ -62,6 +66,8 @@ if "%MENU_NO%"=="7" goto :generate_js
 if "%MENU_NO%"=="8" goto :history_sync
 if "%MENU_NO%"=="9" goto :diff_rebuild
 if "%MENU_NO%"=="10" goto :build_bin
+if "%MENU_NO%"=="11" goto :metadata_export
+if "%MENU_NO%"=="12" goto :metadata_apply
 
 echo.
 echo No action selected. Exit.
@@ -80,6 +86,8 @@ echo 7: Generate JS files (structure.js + gallery-pages.js + site-config.js)
 echo 8: Sync history.txt
 echo 9: Diff rebuild for gallery thumbnails and gallery-pages.js
 echo 10: Build bin executables with cx_Freeze
+echo 11: Export entry metadata (main-person, labels, persons, series, note) to tools/metadata.csv
+echo 12: Apply metadata from tools/metadata.csv to structure.json
 goto :end
 
 :incremental
@@ -152,6 +160,45 @@ echo [Diff rebuild]
 call :run_gallery_thumbnails_diff
 if errorlevel 1 goto :end
 call :run_gallery_pages_diff
+goto :end
+
+:metadata_export
+echo.
+echo [Export metadata to CSV]
+if not exist "%PYTHON_EXE%" (
+  echo Error: Python not found: %PYTHON_EXE%
+  goto :end
+)
+pushd "%ROOT_DIR%" >nul
+"%PYTHON_EXE%" "%METADATA_SCRIPT%" export --output "%METADATA_CSV%"
+set "RC=%ERRORLEVEL%"
+popd >nul
+if "%RC%"=="0" (
+  echo.
+  echo Exported to: %METADATA_CSV%
+) else (
+  echo Error: export failed. exit code=%RC%
+)
+goto :end
+
+:metadata_apply
+echo.
+echo [Apply metadata from CSV]
+if not exist "%PYTHON_EXE%" (
+  echo Error: Python not found: %PYTHON_EXE%
+  goto :end
+)
+if not exist "%METADATA_CSV%" (
+  echo Error: metadata.csv not found. Run export first.
+  goto :end
+)
+pushd "%ROOT_DIR%" >nul
+"%PYTHON_EXE%" "%METADATA_SCRIPT%" apply --input "%METADATA_CSV%"
+set "RC=%ERRORLEVEL%"
+popd >nul
+if not "%RC%"=="0" (
+  echo Error: apply failed. exit code=%RC%
+)
 goto :end
 
 :build_bin

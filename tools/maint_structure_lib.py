@@ -11,7 +11,12 @@ if getattr(sys, "frozen", False):
     ROOT = os.path.abspath(os.path.join(os.path.dirname(sys.executable), "..", ".."))
 else:
     ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
-SITE_DIR = os.path.join(ROOT, "site")
+
+_env_site_dir = os.environ.get("IMVIEWER_SITE_DIR")
+if _env_site_dir and os.path.isdir(_env_site_dir):
+    SITE_DIR = os.path.abspath(_env_site_dir)
+else:
+    SITE_DIR = os.path.join(ROOT, "site")
 CONTENTS_DIR = os.path.join(SITE_DIR, "contents")
 THUMBNAIL_DIR = os.path.join(SITE_DIR, "thumbnail")
 STRUCTURE_JSON_PATH = os.path.join(SITE_DIR, "structure.json")

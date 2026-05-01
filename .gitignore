@@ -20,3 +20,7 @@ site/structure.json
 tools/bin/*
 site/js/gallery-pages.js
 site/js/structure.js
+
+# content_add workspaces (copies of tools/content_add/workspace/ for each server)
+tools/content_add/*/
+!tools/content_add/workspace/

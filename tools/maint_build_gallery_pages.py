@@ -558,6 +558,13 @@ def build_gallery_pages_map(structure: dict, diff: bool = False, generate_thumbn
     return result, metadata
 
 
+def verify_gallery_map_count(structure: dict, map_data: dict) -> tuple[bool, int, int]:
+    """Verify that generated gallery map count matches iter_gallery_paths count."""
+    expected_count = len(list(iter_gallery_paths(structure)))
+    actual_count = len(map_data) if isinstance(map_data, dict) else 0
+    return expected_count == actual_count, expected_count, actual_count
+
+
 def generate_gallery_thumbnails(structure: dict, diff: bool = False) -> dict:
     all_gallery_paths = list(iter_gallery_paths(structure))
     target_gallery_paths = list(all_gallery_paths)
@@ -605,6 +612,11 @@ def main(argv=None) -> int:
     print(f"Generated {GALLERY_PAGES_PATH}")
     print(f"Galleries: {metadata['gallery_count']}, pages: {metadata['page_count']}")
     print(f"Gallery thumbnails: generated={metadata['generated']}, reused={metadata['reused']}")
+    ok, expected_count, actual_count = verify_gallery_map_count(structure, result)
+    print(f"Verify gallery map count: expected={expected_count}, actual={actual_count}")
+    if not ok:
+        print("Error: gallery map count mismatch.")
+        return 2
     return 0
 
 

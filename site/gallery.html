@@ -69,14 +69,14 @@
 
     .pseudo-fullscreen-exit {
       position: absolute;
-      top: 10px;
-      left: 10px;
+      top: calc(env(safe-area-inset-top, 0px) + 10px);
+      left: calc(env(safe-area-inset-left, 0px) + 10px);
       z-index: 35;
       width: 44px;
       height: 44px;
       border-radius: 999px;
-      border: 1px solid rgba(255, 255, 255, 0.42);
-      background: rgba(18, 18, 18, 0.78);
+      border: 1px solid rgba(255, 255, 255, 0.45);
+      background: rgba(14, 14, 14, 0.68);
       color: #fff;
       display: none;
       align-items: center;
@@ -96,7 +96,7 @@
       outline-offset: 2px;
     }
 
-    #photoViewer.is-pseudo-fullscreen .pseudo-fullscreen-exit {
+    #photoViewer.is-overlay-exit-visible .pseudo-fullscreen-exit {
       display: inline-flex;
     }
 
@@ -1015,7 +1015,7 @@
   <!-- Gallery Frame Container -->
   <div class="gallery-frame-container">
     <div id="photoViewer" class="photo-viewer">
-      <button id="pseudoFullscreenExit" class="pseudo-fullscreen-exit" type="button" aria-label="擬似フルスクリーンを終了" hidden>×</button>
+      <button id="pseudoFullscreenExit" class="pseudo-fullscreen-exit" type="button" aria-label="全画面表示を終了" hidden>×</button>
       <div id="thumbList" class="thumb-strip" aria-label="サムネイル一覧"></div>
       <div id="photoStage" class="photo-stage" aria-live="polite" aria-label="メディア表示エリア">
         <div id="zoomControl" class="zoom-control" aria-label="画像ズーム" aria-disabled="true">

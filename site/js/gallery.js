@@ -1474,6 +1474,10 @@ function setupZoomInteractions() {
 
   if (!zoomState.stage) return;
 
+  if (typeof navigator.maxTouchPoints === 'number' && navigator.maxTouchPoints > 0) {
+    zoomState.stage.style.touchAction = 'none';
+  }
+
   if (zoomState.slider) {
     zoomState.slider.min = '0';
     zoomState.slider.max = String(ZOOM_LEVELS.length - 1);
@@ -2655,18 +2659,37 @@ function handleFullscreenChange() {
 function syncFullscreenButtonState() {
   const button = fullscreenState.button || document.getElementById('fullscreenToggle');
   const pseudoExitButton = fullscreenState.exitButton || document.getElementById('pseudoFullscreenExit');
+  const container = fullscreenState.container || document.getElementById('photoViewer');
+  const active = fullscreenState.pseudoEnabled || isNativeFullscreenActive();
+  const showOverlayExit = active && shouldShowOverlayExitButton();
 
   if (pseudoExitButton) {
-    pseudoExitButton.hidden = !fullscreenState.pseudoEnabled;
+    pseudoExitButton.hidden = !showOverlayExit;
+  }
+
+  if (container) {
+    container.classList.toggle('is-overlay-exit-visible', showOverlayExit);
   }
 
   if (!button) {
     return;
   }
 
-  const active = fullscreenState.pseudoEnabled || isNativeFullscreenActive();
   button.textContent = active ? '全画面解除' : '全画面';
   button.setAttribute('aria-pressed', active ? 'true' : 'false');
+}
+
+function shouldShowOverlayExitButton() {
+  const hasTouch = typeof navigator.maxTouchPoints === 'number' && navigator.maxTouchPoints > 0;
+  if (!hasTouch) {
+    return false;
+  }
+
+  if (window.matchMedia('(pointer: coarse)').matches) {
+    return true;
+  }
+
+  return window.matchMedia('(hover: none)').matches;
 }
 
 // ============ Search ============

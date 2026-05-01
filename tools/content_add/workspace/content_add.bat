@@ -30,7 +30,13 @@ if not exist "!CONFIG_FILE!" (
 )
 
 :: Read server.site_dir from config
-for /f "usebackq delims=" %%i in (`"!PYTHON_EXE!" -c "import json,sys; c=json.load(open(sys.argv[1],'r',encoding='utf-8')); print(c['server']['site_dir'])" "!CONFIG_FILE!"`) do set "SERVER_SITE_DIR=%%i"
+set "SERVER_SITE_DIR="
+set "TMP_SITE_DIR_FILE=%TEMP%\imviewer_content_add_site_dir_%RANDOM%.txt"
+"!PYTHON_EXE!" -c "import json,sys; c=json.load(open(sys.argv[1], 'r', encoding='utf-8')); print(str(c.get('server', {}).get('site_dir', '')).strip())" "!CONFIG_FILE!" > "!TMP_SITE_DIR_FILE!" 2>nul
+if exist "!TMP_SITE_DIR_FILE!" (
+    set /p SERVER_SITE_DIR=<"!TMP_SITE_DIR_FILE!"
+    del /q "!TMP_SITE_DIR_FILE!" >nul 2>&1
+)
 
 if "!SERVER_SITE_DIR!"=="" (
     echo [ERROR] server.site_dir is empty in config
@@ -67,7 +73,7 @@ echo.
 
 echo [2-1] Sync structure.json from contents...
 pushd "!ROOT_DIR!" >nul
-"!PYTHON_EXE!" "!TOOLS_DIR!\maint_build_structure.py" --sync
+"!PYTHON_EXE!" "!TOOLS_DIR!\maint_build_structure.py" --sync --no-remove-missing
 set "RC=!ERRORLEVEL!"
 popd >nul
 if not "!RC!"=="0" (

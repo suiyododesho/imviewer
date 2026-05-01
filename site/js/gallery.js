@@ -35,6 +35,14 @@ const zoomState = {
   control: null,
   slider: null,
   valueLabel: null,
+  touchPoints: new Map(),
+  isPinching: false,
+  pinchStartDistance: 0,
+  pinchStartPercent: ZOOM_MIN_PERCENT,
+  controlFadeTimer: null,
+  lastCenterTapTimeMs: 0,
+  lastCenterTapX: 0,
+  lastCenterTapY: 0,
 };
 
 const thumbnailModeState = {
@@ -91,6 +99,8 @@ const swipeNavState = {
 const STAGE_THUMBNAIL_SIZE = 176;
 const GALLERY_VIEW_MODE_STORAGE_KEY_PREFIX = 'imviewer.gallery.viewMode';
 const GALLERY_VIEW_MODE_LEGACY_STORAGE_KEY = 'imviewer.gallery.viewMode';
+const GALLERY_VIEW_MODE_SCOPE_SMARTPHONE = 'sp';
+const GALLERY_VIEW_MODE_SCOPE_DEFAULT = 'default';
 
 const GALLERY_VIEW_MODES = [
   { key: 'single', label: '単一ページ表示' },
@@ -1474,17 +1484,26 @@ function setupZoomInteractions() {
       const requestedIndex = Math.round(Number(zoomState.slider.value));
       const safeIndex = Math.max(0, Math.min(ZOOM_LEVELS.length - 1, requestedIndex));
       const nextPercent = ZOOM_LEVELS[safeIndex];
+      showTransientZoomControl();
       setZoomPercent(nextPercent);
+    });
+
+    zoomState.slider.addEventListener('pointerdown', () => {
+      showTransientZoomControl({ keepVisible: true });
     });
   }
 
   zoomState.stage.addEventListener('wheel', handleStageWheel, { passive: false });
+  zoomState.stage.addEventListener('pointerdown', handlePinchPointerDown);
   zoomState.stage.addEventListener('pointerdown', handleSwipeNavigationStart);
   zoomState.stage.addEventListener('pointerdown', handlePanStart);
+  document.addEventListener('pointermove', handlePinchPointerMove);
   document.addEventListener('pointermove', handleSwipeNavigationMove);
   document.addEventListener('pointermove', handlePanMove);
+  document.addEventListener('pointerup', handlePinchPointerEnd);
   document.addEventListener('pointerup', handleSwipeNavigationEnd);
   document.addEventListener('pointerup', handlePanEnd);
+  document.addEventListener('pointercancel', handlePinchPointerEnd);
   document.addEventListener('pointercancel', handleSwipeNavigationEnd);
   document.addEventListener('pointercancel', handlePanEnd);
   window.addEventListener('resize', handleViewportChanged);
@@ -1502,6 +1521,7 @@ function setZoomMedia(imageElement) {
   zoomState.panY = 0;
   zoomState.isDragging = false;
   zoomState.pointerId = null;
+  resetPinchState();
 
   if (!zoomState.activeImage) {
     setZoomControlEnabled(false);
@@ -1529,6 +1549,7 @@ function setZoomSpread(wrapperElement) {
   zoomState.panY = 0;
   zoomState.isDragging = false;
   zoomState.pointerId = null;
+  resetPinchState();
 
   if (!zoomState.spreadWrapper) {
     setZoomControlEnabled(false);
@@ -1548,6 +1569,7 @@ function resetZoomState() {
   zoomState.panY = 0;
   zoomState.isDragging = false;
   zoomState.pointerId = null;
+  resetPinchState();
   updateZoomIndicator();
   applyZoomTransform();
 }
@@ -1562,6 +1584,7 @@ function handleStageWheel(event) {
   }
 
   event.preventDefault();
+  showTransientZoomControl();
 
   const direction = event.deltaY < 0 ? 1 : -1;
   const nextPercent = getAdjacentZoomPercent(zoomState.percent, direction);
@@ -1618,6 +1641,7 @@ function ensureZoomableImageForInteraction() {
 }
 
 function handlePanStart(event) {
+  if (zoomState.isPinching || (event.pointerType === 'touch' && zoomState.touchPoints.size > 1)) return;
   if ((!zoomState.activeImage && !zoomState.spreadWrapper) || zoomState.percent <= ZOOM_MIN_PERCENT) return;
   if (event.button !== 0) return;
   if (event.target && typeof event.target.closest === 'function' && event.target.closest('#zoomControl')) return;
@@ -1662,6 +1686,9 @@ function handleSwipeNavigationStart(event) {
 }
 
 function handleSwipeNavigationMove(event) {
+  if (zoomState.isPinching) {
+    return;
+  }
   if (!swipeNavState.tracking || swipeNavState.pointerId !== event.pointerId) {
     return;
   }
@@ -1731,6 +1758,10 @@ function handleSwipeNavigationEnd(event) {
   const isTap = absX < 12 && absY < 12;
   const isHorizontalSwipe = absX >= 24;
 
+  if (isTap && !isLeftEdge && !isRightEdge && maybeHandleCenterDoubleTap(event.clientX, event.clientY)) {
+    return;
+  }
+
   if (isRightEdge && (isTap || isHorizontalSwipe)) {
     navigateNextPage();
   } else if (isLeftEdge && (isTap || isHorizontalSwipe)) {
@@ -1767,10 +1798,64 @@ function getSwipeNavigationZones() {
   };
 }
 
+function maybeHandleCenterDoubleTap(clientX, clientY) {
+  if (!isCenterDoubleTapArea(clientX, clientY)) {
+    resetCenterDoubleTapState();
+    return false;
+  }
+
+  const now = Date.now();
+  const isWithinTime = (now - zoomState.lastCenterTapTimeMs) <= 320;
+  const dx = clientX - zoomState.lastCenterTapX;
+  const dy = clientY - zoomState.lastCenterTapY;
+  const isWithinDistance = Math.hypot(dx, dy) <= 34;
+
+  zoomState.lastCenterTapTimeMs = now;
+  zoomState.lastCenterTapX = clientX;
+  zoomState.lastCenterTapY = clientY;
+
+  if (!isWithinTime || !isWithinDistance) {
+    return false;
+  }
+
+  resetCenterDoubleTapState();
+  setZoomPercent(ZOOM_MIN_PERCENT);
+  showTransientZoomControl();
+  return true;
+}
+
+function isCenterDoubleTapArea(clientX, clientY) {
+  if (!zoomState.stage) {
+    return false;
+  }
+
+  const rect = zoomState.stage.getBoundingClientRect();
+  if (!rect.width || !rect.height) {
+    return false;
+  }
+
+  const centerZoneWidth = rect.width * 0.52;
+  const centerZoneHeight = rect.height * 0.62;
+  const left = rect.left + ((rect.width - centerZoneWidth) / 2);
+  const right = rect.right - ((rect.width - centerZoneWidth) / 2);
+  const top = rect.top + ((rect.height - centerZoneHeight) / 2);
+  const bottom = rect.bottom - ((rect.height - centerZoneHeight) / 2);
+
+  return clientX >= left && clientX <= right && clientY >= top && clientY <= bottom;
+}
+
+function resetCenterDoubleTapState() {
+  zoomState.lastCenterTapTimeMs = 0;
+  zoomState.lastCenterTapX = 0;
+  zoomState.lastCenterTapY = 0;
+}
+
 function canStartSwipeNavigation(event) {
   if (!zoomState.stage || !zoomState.stage.contains(event.target)) return false;
   if (event.pointerType !== 'touch') return false;
   if (!event.isPrimary) return false;
+  if (zoomState.isPinching) return false;
+  if (zoomState.touchPoints.size > 1) return false;
   if (thumbnailModeState.enabled) return false;
   if (zoomState.isDragging) return false;
   if (zoomState.percent > ZOOM_MIN_PERCENT) return false;
@@ -1785,6 +1870,7 @@ function canStartSwipeNavigation(event) {
 }
 
 function handlePanMove(event) {
+  if (zoomState.isPinching) return;
   if (!zoomState.isDragging || zoomState.pointerId !== event.pointerId) return;
 
   const deltaX = event.clientX - zoomState.dragStartX;
@@ -1910,6 +1996,173 @@ function setZoomControlEnabled(enabled) {
   if (zoomState.control) {
     zoomState.control.setAttribute('aria-disabled', enabled ? 'false' : 'true');
   }
+
+  if (!enabled) {
+    hideTransientZoomControl(true);
+  }
+}
+
+function resetPinchState() {
+  zoomState.touchPoints.clear();
+  zoomState.isPinching = false;
+  zoomState.pinchStartDistance = 0;
+  zoomState.pinchStartPercent = zoomState.percent;
+  resetCenterDoubleTapState();
+}
+
+function isCompactViewport() {
+  return window.matchMedia('(max-width: 768px)').matches;
+}
+
+function showTransientZoomControl(options = {}) {
+  if (!zoomState.control || !isCompactViewport()) {
+    return;
+  }
+
+  zoomState.control.classList.add('is-transient-visible');
+
+  if (zoomState.controlFadeTimer) {
+    window.clearTimeout(zoomState.controlFadeTimer);
+    zoomState.controlFadeTimer = null;
+  }
+
+  if (!options.keepVisible) {
+    zoomState.controlFadeTimer = window.setTimeout(() => {
+      hideTransientZoomControl();
+    }, 1400);
+  }
+}
+
+function hideTransientZoomControl(force = false) {
+  if (!zoomState.control) {
+    return;
+  }
+
+  if (zoomState.controlFadeTimer) {
+    window.clearTimeout(zoomState.controlFadeTimer);
+    zoomState.controlFadeTimer = null;
+  }
+
+  if (force || isCompactViewport()) {
+    zoomState.control.classList.remove('is-transient-visible');
+  }
+}
+
+function handlePinchPointerDown(event) {
+  if (event.pointerType !== 'touch') {
+    return;
+  }
+
+  zoomState.touchPoints.set(event.pointerId, { x: event.clientX, y: event.clientY });
+
+  if (zoomState.touchPoints.size >= 2) {
+    initializePinchGesture();
+    if (event.cancelable) {
+      event.preventDefault();
+    }
+  }
+}
+
+function handlePinchPointerMove(event) {
+  if (event.pointerType !== 'touch') {
+    return;
+  }
+
+  if (!zoomState.touchPoints.has(event.pointerId)) {
+    return;
+  }
+
+  zoomState.touchPoints.set(event.pointerId, { x: event.clientX, y: event.clientY });
+
+  if (zoomState.touchPoints.size < 2) {
+    return;
+  }
+
+  if (!zoomState.isPinching) {
+    initializePinchGesture();
+  }
+
+  const points = getFirstTwoTouchPoints();
+  if (!points) {
+    return;
+  }
+
+  const distance = getTouchDistance(points[0], points[1]);
+  if (distance <= 0 || zoomState.pinchStartDistance <= 0) {
+    return;
+  }
+
+  const nextPercent = zoomState.pinchStartPercent * (distance / zoomState.pinchStartDistance);
+  const anchorClientX = (points[0].x + points[1].x) / 2;
+  const anchorClientY = (points[0].y + points[1].y) / 2;
+
+  setZoomPercent(nextPercent, { anchorClientX, anchorClientY });
+  showTransientZoomControl({ keepVisible: true });
+
+  if (event.cancelable) {
+    event.preventDefault();
+  }
+}
+
+function handlePinchPointerEnd(event) {
+  if (event.pointerType !== 'touch') {
+    return;
+  }
+
+  zoomState.touchPoints.delete(event.pointerId);
+
+  if (zoomState.isPinching && zoomState.touchPoints.size < 2) {
+    zoomState.isPinching = false;
+    zoomState.pinchStartDistance = 0;
+    zoomState.pinchStartPercent = zoomState.percent;
+    showTransientZoomControl();
+  }
+}
+
+function initializePinchGesture() {
+  if (!ensureZoomableImageForInteraction()) {
+    return;
+  }
+
+  const points = getFirstTwoTouchPoints();
+  if (!points) {
+    return;
+  }
+
+  const distance = getTouchDistance(points[0], points[1]);
+  if (distance <= 0) {
+    return;
+  }
+
+  zoomState.isPinching = true;
+  zoomState.pinchStartDistance = distance;
+  zoomState.pinchStartPercent = zoomState.percent;
+
+  swipeNavState.tracking = false;
+  swipeNavState.pointerId = null;
+  swipeNavState.axis = 'none';
+
+  if (zoomState.isDragging) {
+    zoomState.isDragging = false;
+    zoomState.pointerId = null;
+    applyZoomTransform();
+  }
+
+  showTransientZoomControl({ keepVisible: true });
+}
+
+function getFirstTwoTouchPoints() {
+  const points = Array.from(zoomState.touchPoints.values());
+  if (points.length < 2) {
+    return null;
+  }
+  return [points[0], points[1]];
+}
+
+function getTouchDistance(a, b) {
+  const dx = a.x - b.x;
+  const dy = a.y - b.y;
+  return Math.hypot(dx, dy);
 }
 
 // ============ Display Mode ============
@@ -2032,10 +2285,19 @@ function applyGalleryViewMode(mode, persist) {
 
 function loadGalleryViewMode() {
   try {
-    const perContentKey = getGalleryViewModeStorageKey();
-    const stored = window.localStorage.getItem(perContentKey);
-    if (stored !== null) {
-      return normalizeGalleryViewMode(stored);
+    const currentScopeKey = getGalleryViewModeStorageKey();
+    const currentScopeStored = window.localStorage.getItem(currentScopeKey);
+    if (currentScopeStored !== null) {
+      return normalizeGalleryViewMode(currentScopeStored);
+    }
+
+    // Smartphone mode is isolated, but on first run reuse the default scope if it exists.
+    if (getGalleryViewModeScope() === GALLERY_VIEW_MODE_SCOPE_SMARTPHONE) {
+      const defaultScopeKey = getGalleryViewModeStorageKeyByScope(GALLERY_VIEW_MODE_SCOPE_DEFAULT);
+      const defaultStored = window.localStorage.getItem(defaultScopeKey);
+      if (defaultStored !== null) {
+        return normalizeGalleryViewMode(defaultStored);
+      }
     }
 
     // Backward compatibility: previously this setting was global.
@@ -2057,11 +2319,38 @@ function persistGalleryViewMode(mode) {
 }
 
 function getGalleryViewModeStorageKey() {
+  return getGalleryViewModeStorageKeyByScope(getGalleryViewModeScope());
+}
+
+function getGalleryViewModeStorageKeyByScope(scope) {
+  const normalizedScope = scope === GALLERY_VIEW_MODE_SCOPE_SMARTPHONE
+    ? GALLERY_VIEW_MODE_SCOPE_SMARTPHONE
+    : GALLERY_VIEW_MODE_SCOPE_DEFAULT;
   const contentPath = normalizePath(currentContentPath || currentGallery?.path || '');
   if (!contentPath) {
-    return GALLERY_VIEW_MODE_STORAGE_KEY_PREFIX;
+    return `${GALLERY_VIEW_MODE_STORAGE_KEY_PREFIX}:${normalizedScope}`;
   }
-  return `${GALLERY_VIEW_MODE_STORAGE_KEY_PREFIX}:${contentPath}`;
+  return `${GALLERY_VIEW_MODE_STORAGE_KEY_PREFIX}:${normalizedScope}:${contentPath}`;
+}
+
+function getGalleryViewModeScope() {
+  return isSmartphoneDeviceForViewMode() ? GALLERY_VIEW_MODE_SCOPE_SMARTPHONE : GALLERY_VIEW_MODE_SCOPE_DEFAULT;
+}
+
+function isSmartphoneDeviceForViewMode() {
+  const ua = navigator.userAgent || '';
+  const isMobileUa = /iPhone|iPod|Android.+Mobile|Windows Phone|webOS|BlackBerry|Opera Mini|IEMobile/i.test(ua);
+  if (isMobileUa) {
+    return true;
+  }
+
+  const touchCapable = typeof navigator.maxTouchPoints === 'number' && navigator.maxTouchPoints > 0;
+  if (!touchCapable) {
+    return false;
+  }
+
+  const shortEdge = Math.min(window.screen?.width || window.innerWidth || 0, window.screen?.height || window.innerHeight || 0);
+  return shortEdge > 0 && shortEdge <= 540;
 }
 
 // ============ Navigation ============

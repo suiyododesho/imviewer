@@ -676,6 +676,16 @@
         padding: 6px 8px;
         flex-direction: row;
         gap: 6px;
+        opacity: 0;
+        visibility: hidden;
+        pointer-events: none;
+        transition: opacity 180ms ease, visibility 180ms ease;
+      }
+
+      .zoom-control.is-transient-visible {
+        opacity: 1;
+        visibility: visible;
+        pointer-events: auto;
       }
 
       .zoom-slider {

@@ -137,10 +137,21 @@ try {
     Write-Host "      完了: $ExtractDir"
 
     # GitHub zip は {repo}-{branch}/ というトップレベルディレクトリを持つ
-    # Get-ChildItem が単一オブジェクトを返す場合に備えて配列化する
-    $TopDirs = @(Get-ChildItem -Path $ExtractDir -Directory)
-    if ($TopDirs.Count -ne 1) {
-        Write-Error "展開結果のディレクトリ構造が想定と異なります（トップレベルディレクトリが $($TopDirs.Count) 個）"
+    # Get-ChildItem の戻り値が単一オブジェクトや $null の場合に備えて安全に配列化する
+    $rawTop = Get-ChildItem -Path $ExtractDir -Directory
+    if ($null -eq $rawTop) {
+        Write-Error "展開結果にディレクトリが見つかりません: $ExtractDir"
+        exit 1
+    }
+    if ($rawTop -is [System.Array]) {
+        $TopDirs = $rawTop
+    } else {
+        $TopDirs = @($rawTop)
+    }
+
+    $topCount = $TopDirs.Count
+    if ($topCount -ne 1) {
+        Write-Error "展開結果のディレクトリ構造が想定と異なります（トップレベルディレクトリが $topCount 個）"
         exit 1
     }
     $SourceRoot = $TopDirs[0].FullName

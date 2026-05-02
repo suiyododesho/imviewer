@@ -22,6 +22,7 @@ from __future__ import annotations
 import argparse
 import csv
 import os
+import subprocess
 import sys
 import re
 import unicodedata
@@ -33,6 +34,7 @@ try:
         get_series_entries_map,
         load_structure,
         save_structure,
+        write_structure_js,
     )
 except ImportError:
     from maint_structure_lib import (
@@ -40,6 +42,7 @@ except ImportError:
         get_series_entries_map,
         load_structure,
         save_structure,
+        write_structure_js,
     )
 
 # ── CSV layout ────────────────────────────────────────────────────────────────
@@ -85,6 +88,38 @@ def _slugify_to_ascii(text: str) -> str:
     # Fallback: stable short hex of original utf-8 bytes
     h = hashlib.sha1(orig.encode('utf-8')).hexdigest()[:8]
     return f"x{h}"
+
+
+def _regenerate_gallery_pages_js() -> tuple[bool, str]:
+    """Regenerate site/js/gallery-pages.js by invoking maint_build_gallery_pages.py."""
+    tools_dir = os.path.dirname(os.path.abspath(__file__))
+    root_dir = os.path.abspath(os.path.join(tools_dir, ".."))
+    script_path = os.path.join(tools_dir, "maint_build_gallery_pages.py")
+
+    if not os.path.isfile(script_path):
+        return False, f"Script not found: {script_path}"
+
+    python_exe = sys.executable or "python"
+    try:
+        proc = subprocess.run(
+            [python_exe, script_path],
+            cwd=root_dir,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+    except Exception as exc:
+        return False, str(exc)
+
+    if proc.returncode == 0:
+        return True, ""
+
+    detail = (proc.stderr or proc.stdout or "").strip()
+    if detail:
+        detail = detail.splitlines()[-1]
+    else:
+        detail = f"exit code={proc.returncode}"
+    return False, detail
 
 
 # ── export ────────────────────────────────────────────────────────────────────
@@ -197,7 +232,21 @@ def cmd_apply(args: argparse.Namespace) -> None:
     else:
         if changed:
             save_structure(structure)
-            print(f"Applied: {changed} entries updated, {not_found} not found. Saved to structure.json.")
+            try:
+                write_structure_js(structure)
+                ok, detail = _regenerate_gallery_pages_js()
+                if ok:
+                    print(
+                        f"Applied: {changed} entries updated, {not_found} not found. "
+                        "Saved to structure.json and regenerated site/js/structure.js + site/js/gallery-pages.js."
+                    )
+                else:
+                    print(
+                        f"Applied: {changed} entries updated, {not_found} not found. "
+                        f"Saved to structure.json and regenerated site/js/structure.js. (gallery-pages.js regen failed: {detail})"
+                    )
+            except Exception as exc:
+                print(f"Applied: {changed} entries updated, {not_found} not found. Saved to structure.json. (structure.js regen failed: {exc})")
         else:
             print(f"No changes detected. ({not_found} not found)")
 

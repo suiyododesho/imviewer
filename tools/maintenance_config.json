@@ -2,5 +2,8 @@
   "archive_extract": {
     "long_edge_px": 2000,
     "pdf_render_dpi": 200
+  },
+  "update": {
+    "zip_url": "https://github.com/YOUR_USERNAME/imviewer/archive/refs/heads/main.zip"
   }
 }

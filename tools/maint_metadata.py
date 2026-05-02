@@ -44,7 +44,8 @@ except ImportError:
 
 # ── CSV layout ────────────────────────────────────────────────────────────────
 CSV_COLUMNS = ["genre", "entry_key", "name", "main-person", "persons", "labels", "note"]
-EDITABLE_FIELDS = ["main-person", "series", "persons", "labels", "note"]
+# Allow `name` to be updated from CSV (export includes name; apply now writes it back)
+EDITABLE_FIELDS = ["name", "main-person", "series", "persons", "labels", "note"]
 LIST_FIELDS = {"persons", "labels"}
 LIST_SEP = ";"
 

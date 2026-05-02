@@ -13,3 +13,4 @@ echo.
 powershell -NoProfile -ExecutionPolicy RemoteSigned -File "%SCRIPT_DIR%update.ps1" %*
 
 endlocal
+

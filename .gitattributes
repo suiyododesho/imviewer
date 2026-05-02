@@ -1,0 +1,16 @@
+# Prevent automatic end-of-line normalization by default: keep files' existing line endings
+* -text
+
+# Treat common text file types as text so diffs remain readable (preserve existing EOLs)
+*.md text
+*.txt text
+*.py text
+*.js text
+*.css text
+*.html text
+*.json text
+
+# Windows batch files should retain CRLF when created/edited on Windows
+*.bat text eol=crlf
+
+# If you prefer different rules for specific file types, edit this file.

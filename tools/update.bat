@@ -1,7 +1,7 @@
 @echo off
-chcp 932 >nul
 setlocal
 
+chcp 65001 >nul
 set "SCRIPT_DIR=%~dp0"
 
 echo.

@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
     imviewer システムアップデートスクリプト
 

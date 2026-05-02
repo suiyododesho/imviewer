@@ -7,15 +7,14 @@ Usage:
   # Apply CSV metadata back to structure.json (dry-run to preview changes)
   python maint_metadata.py apply [--input metadata.csv] [--dry-run]
 
-CSV columns:
-  genre       : genre key (comic / photo / gamecg ...)
-  entry_key   : entry key in structure.json
-  name        : display name (read-only, not written back)
-  main-person : main author/person string
-  series      : series name string
-  persons     : semicolon-separated list  (e.g. "人物A;人物B")
-  labels      : semicolon-separated list  (e.g. "成人向け;完結")
-  note        : free-form note string
+CSV columns (export omits `series`; on apply `series` will be set from `name` if missing):
+    genre       : genre key (comic / photo / gamecg ...)
+    entry_key   : entry key in structure.json
+    name        : display name (read-only, not written back)
+    main-person : main author/person string
+    persons     : semicolon-separated list  (e.g. "人物A;人物B")
+    labels      : semicolon-separated list  (e.g. "成人向け;完結")
+    note        : free-form note string
 """
 
 from __future__ import annotations
@@ -24,6 +23,9 @@ import argparse
 import csv
 import os
 import sys
+import re
+import unicodedata
+import hashlib
 
 try:
     from .maint_structure_lib import (
@@ -41,7 +43,7 @@ except ImportError:
     )
 
 # ── CSV layout ────────────────────────────────────────────────────────────────
-CSV_COLUMNS = ["genre", "entry_key", "name", "main-person", "series", "persons", "labels", "note"]
+CSV_COLUMNS = ["genre", "entry_key", "name", "main-person", "persons", "labels", "note"]
 EDITABLE_FIELDS = ["main-person", "series", "persons", "labels", "note"]
 LIST_FIELDS = {"persons", "labels"}
 LIST_SEP = ";"
@@ -59,6 +61,31 @@ def _csv_to_list(cell: str) -> list[str]:
     return [v.strip() for v in cell.split(LIST_SEP) if v.strip()]
 
 
+def _slugify_to_ascii(text: str) -> str:
+    """Create an ASCII slug from `text`.
+
+    - Normalize (NFKD) and remove combining marks
+    - Keep ASCII alnum characters, replace other runs with '-'
+    - Lowercase
+    - If result is empty (e.g. non-latin scripts), return a stable hex-based fallback
+    """
+    if not text:
+        return ""
+    orig = text
+    # Normalize and remove diacritics
+    text = unicodedata.normalize("NFKD", text)
+    text = "".join(ch for ch in text if not unicodedata.category(ch).startswith("M"))
+    text = text.lower()
+    # Replace non-ascii alnum with hyphen
+    text = re.sub(r'[^a-z0-9]+', '-', text)
+    text = text.strip('-')
+    if text:
+        return text
+    # Fallback: stable short hex of original utf-8 bytes
+    h = hashlib.sha1(orig.encode('utf-8')).hexdigest()[:8]
+    return f"x{h}"
+
+
 # ── export ────────────────────────────────────────────────────────────────────
 
 def cmd_export(args: argparse.Namespace) -> None:
@@ -72,12 +99,12 @@ def cmd_export(args: argparse.Namespace) -> None:
         for entry_key, entry_data in get_series_entries_map(genre_data).items():
             if not isinstance(entry_data, dict):
                 continue
+            # Export: do not include `series` column by policy; editors will edit `name` only.
             row: dict[str, str] = {
                 "genre": genre_key,
                 "entry_key": entry_key,
                 "name": entry_data.get("name", ""),
                 "main-person": entry_data.get("main-person", ""),
-                "series": entry_data.get("series", ""),
                 "persons": _list_to_csv(entry_data.get("persons") or []),
                 "labels": _list_to_csv(entry_data.get("labels") or []),
                 "note": entry_data.get("note", ""),
@@ -112,6 +139,11 @@ def cmd_apply(args: argparse.Namespace) -> None:
             if not genre or not entry_key:
                 print(f"  WARNING: row {i} skipped (missing genre or entry_key)")
                 continue
+            # If `series` column absent or empty, create slug from `name` per policy
+            series_val = (row.get("series") or "").strip()
+            if not series_val:
+                series_val = _slugify_to_ascii((row.get("name") or "").strip())
+            row["series"] = series_val
             rows_by_key[(genre, entry_key)] = row
 
     # Load structure

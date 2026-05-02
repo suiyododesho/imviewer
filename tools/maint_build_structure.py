@@ -160,7 +160,7 @@ def _matches_targets(series_path: str, targets: list[str]) -> bool:
     return False
 
 
-def rebuild_structure_contents(structure: dict, targets: list[str] | None = None) -> tuple[dict, list[dict]]:
+def rebuild_structure_contents(structure: dict, targets: list[str] | None = None, no_remove_missing: bool = False) -> tuple[dict, list[dict]]:
     changed: list[dict] = []
     deleted_series: list[tuple[str, str, str]] = []
     target_list = targets or []
@@ -172,7 +172,8 @@ def rebuild_structure_contents(structure: dict, targets: list[str] | None = None
 
         series_abs = os.path.join(CONTENTS_DIR, series_path)
         if not (os.path.isdir(series_abs) or os.path.isfile(series_abs)):
-            deleted_series.append((genre_key, series_key, series_path))
+            if not no_remove_missing:
+                deleted_series.append((genre_key, series_key, series_path))
             continue
 
         generated = scan_contents_entries(series_path)
@@ -210,9 +211,9 @@ def rebuild_structure_contents(structure: dict, targets: list[str] | None = None
     return structure, changed
 
 
-def sync_structure_from_contents(structure: dict, targets: list[str] | None = None) -> tuple[dict, list[dict]]:
+def sync_structure_from_contents(structure: dict, targets: list[str] | None = None, no_remove_missing: bool = False) -> tuple[dict, list[dict]]:
     updated, added = scaffold_missing_series(structure, targets)
-    updated, changed = rebuild_structure_contents(updated, targets)
+    updated, changed = rebuild_structure_contents(updated, targets, no_remove_missing=no_remove_missing)
     return updated, added + changed
 
 
@@ -221,6 +222,7 @@ def parse_args(argv=None):
     parser.add_argument("--diff", nargs="*", default=None, help="Only rebuild matching series paths")
     parser.add_argument("--add-missing-series", action="store_true", help="Scaffold missing series entries from site/contents")
     parser.add_argument("--sync", action="store_true", help="Add/remove series and rebuild contents skeletons from site/contents")
+    parser.add_argument("--no-remove-missing", action="store_true", help="With --sync: skip deletion of series whose path is not found locally (use when site/contents is a partial subset)")
     parser.add_argument("--dry-run", action="store_true", help="Show changes without writing")
     return parser.parse_args(argv)
 
@@ -229,7 +231,7 @@ def main(argv=None) -> int:
     args = parse_args(argv)
     structure = load_structure()
     if args.sync:
-        updated, changed = sync_structure_from_contents(structure, args.diff)
+        updated, changed = sync_structure_from_contents(structure, args.diff, no_remove_missing=args.no_remove_missing)
     elif args.add_missing_series:
         updated, changed = scaffold_missing_series(structure, args.diff)
     else:

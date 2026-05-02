@@ -53,7 +53,13 @@ echo 12: Apply metadata from CSV to structure.json
 echo Other or empty input: Exit
 echo.
 
-set /p MENU_NO=Select menu number and press Enter: 
+set "MENU_NO=%~1"
+if not defined MENU_NO (
+  set /p MENU_NO=Select menu number and press Enter: 
+)
+set "MENU_NO=%MENU_NO:\"=%"
+echo [DEBUG] MENU_NO="%MENU_NO%"
+echo.
 
 if "%MENU_NO%"=="0" goto :help
 if "%MENU_NO%"=="1" goto :incremental
@@ -103,7 +109,7 @@ call :run_refresh_covers
 if errorlevel 1 goto :end
 call :run_structure_js
 if errorlevel 1 goto :end
-call :run_gallery_pages
+call :invoke_run_gallery_pages
 if errorlevel 1 goto :end
 call :run_site_config
 goto :end
@@ -143,7 +149,7 @@ echo.
 echo [Generate JS files]
 call :run_structure_js
 if errorlevel 1 goto :end
-call :run_gallery_pages
+call :invoke_run_gallery_pages
 if errorlevel 1 goto :end
 call :run_site_config
 goto :end
@@ -268,7 +274,24 @@ exit /b %ERRORLEVEL%
 call :run_python_or_exe "%STRUCTURE_JS_SCRIPT%" "%STRUCTURE_JS_EXE%" "maint_build_structure_js.py running..."
 exit /b %ERRORLEVEL%
 
+:invoke_run_gallery_pages
+echo [DEBUG] checking label :run_gallery_pages
+findstr /b /c:":run_gallery_pages" "%~f0" >nul
+if errorlevel 1 (
+  echo [DEBUG] label :run_gallery_pages not found in script. fallback to direct gallery-pages build.
+  call :run_python_or_exe "%GALLERY_SCRIPT%" "%GALLERY_EXE%" "maint_build_gallery_pages.py running..."
+  exit /b %ERRORLEVEL%
+)
+echo [DEBUG] call :run_gallery_pages (reachability check)
+call :run_gallery_pages
+set "RC=%ERRORLEVEL%"
+if "%RC%"=="0" exit /b 0
+echo [DEBUG] call :run_gallery_pages failed (exit=%RC%). fallback to direct gallery-pages build.
+call :run_python_or_exe "%GALLERY_SCRIPT%" "%GALLERY_EXE%" "maint_build_gallery_pages.py running..."
+exit /b %ERRORLEVEL%
+
 :run_gallery_pages
+echo [DEBUG] entered :run_gallery_pages
 call :run_python_or_exe "%GALLERY_SCRIPT%" "%GALLERY_EXE%" "maint_build_gallery_pages.py running..."
 exit /b %ERRORLEVEL%
 
@@ -343,7 +366,4 @@ exit /b 0
 echo.
 echo Done.
 endlocal
-
-echo.
-echo Done.
-endlocal
+exit /b 0

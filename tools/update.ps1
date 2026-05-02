@@ -18,7 +18,8 @@
 
 [CmdletBinding()]
 param(
-    [switch]$DryRun
+    [switch]$DryRun,
+    [string]$TargetRoot
 )
 
 Set-StrictMode -Version Latest
@@ -28,7 +29,12 @@ $ErrorActionPreference = "Stop"
 # パス設定
 # ---------------------------------------------------------------------------
 $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
-$RootDir   = Split-Path -Parent $ScriptDir
+# TargetRoot を明示的に与えられた場合はそこを更新先とする
+if ($TargetRoot) {
+    $RootDir = (Resolve-Path -LiteralPath $TargetRoot).ProviderPath
+} else {
+    $RootDir = Split-Path -Parent $ScriptDir
+}
 $ConfigFile = Join-Path $ScriptDir "maintenance_config.json"
 
 # ---------------------------------------------------------------------------
@@ -131,7 +137,8 @@ try {
     Write-Host "      完了: $ExtractDir"
 
     # GitHub zip は {repo}-{branch}/ というトップレベルディレクトリを持つ
-    $TopDirs = Get-ChildItem -Path $ExtractDir -Directory
+    # Get-ChildItem が単一オブジェクトを返す場合に備えて配列化する
+    $TopDirs = @(Get-ChildItem -Path $ExtractDir -Directory)
     if ($TopDirs.Count -ne 1) {
         Write-Error "展開結果のディレクトリ構造が想定と異なります（トップレベルディレクトリが $($TopDirs.Count) 個）"
         exit 1
@@ -148,6 +155,10 @@ try {
     $AllFiles   = Get-ChildItem -Path $SourceRoot -Recurse -File
     $CopyCount  = 0
     $SkipCount  = 0
+    $LogFile = Join-Path $env:TEMP ("imviewer_update_" + (Get-Date -Format "yyyyMMddHHmmss") + ".log")
+    "Update started: $(Get-Date)" | Out-File -FilePath $LogFile -Encoding UTF8
+    "Download URL: $UpdateUrl" | Out-File -FilePath $LogFile -Append -Encoding UTF8
+    "Target root:  $RootDir" | Out-File -FilePath $LogFile -Append -Encoding UTF8
 
     foreach ($File in $AllFiles) {
         # zip 内の相対パス（トップレベルディレクトリを除く）
@@ -156,6 +167,7 @@ try {
         # 除外判定
         if (Test-Excluded $RelPath) {
             Write-Host "  [SKIP] $RelPath" -ForegroundColor DarkGray
+            "$RelPath	SKIP" | Out-File -FilePath $LogFile -Append -Encoding UTF8
             $SkipCount++
             continue
         }
@@ -164,6 +176,7 @@ try {
 
         if ($DryRun) {
             Write-Host "  [COPY] $RelPath" -ForegroundColor Green
+            "$RelPath	COPY(DRY) -> $DestPath" | Out-File -FilePath $LogFile -Append -Encoding UTF8
         } else {
             $DestParent = Split-Path -Parent $DestPath
             if (-not (Test-Path $DestParent)) {
@@ -171,6 +184,7 @@ try {
             }
             Copy-Item -Path $File.FullName -Destination $DestPath -Force
             Write-Host "  [COPY] $RelPath" -ForegroundColor Green
+            "$RelPath	COPY -> $DestPath" | Out-File -FilePath $LogFile -Append -Encoding UTF8
         }
         $CopyCount++
     }
@@ -189,6 +203,8 @@ try {
     Write-Host "  コピー対象: $CopyCount ファイル"
     Write-Host "  スキップ  : $SkipCount ファイル（ユーザーデータ・設定）"
     Write-Host ""
+    Write-Host "ログファイル: $LogFile"
+    "Update finished: $(Get-Date)" | Out-File -FilePath $LogFile -Append -Encoding UTF8
 
 } finally {
     # 一時ディレクトリ削除

@@ -1,0 +1,231 @@
+{
+  "contents-root": "contents",
+  "genres": {
+    "comic": {
+      "name": "漫画",
+      "path": "comic",
+      "entries": {
+        "[ろ][ろくろ] 女友達は頼めば意外とヤらせてくれる": {
+          "path": "comic/[ろ][ろくろ] 女友達は頼めば意外とヤらせてくれる",
+          "name": "[ろ][ろくろ] 女友達は頼めば意外とヤらせてくれる",
+          "series": "x63706cfa",
+          "main-person": "",
+          "persons": [],
+          "labels": [],
+          "note": "",
+          "cover": "",
+          "contents": [
+            {
+              "path": "comic/[ろ][ろくろ] 女友達は頼めば意外とヤらせてくれる/[ろくろ] 女友達は頼めば意外とヤらせてくれる 第01巻_pdf",
+              "cover": "thumbnail/comic/[ろ][ろくろ] 女友達は頼めば意外とヤらせてくれる/[ろくろ] 女友達は頼めば意外とヤらせてくれる 第01巻_pdf/cover.jpg",
+              "name": "[ろくろ] 女友達は頼めば意外とヤらせてくれる 第01巻_pdf",
+              "note": ""
+            }
+          ],
+          "exturl": []
+        },
+        "[ふ][フクダーダ] 許嫁協定": {
+          "path": "comic/[ふ][フクダーダ] 許嫁協定",
+          "name": "[ふ][フクダーダ] 許嫁協定",
+          "series": "x8be12629",
+          "main-person": "",
+          "persons": [],
+          "labels": [],
+          "note": "",
+          "cover": "",
+          "contents": [
+            {
+              "path": "comic/[ふ][フクダーダ] 許嫁協定/[フクダーダ] 許嫁協定 第01巻",
+              "cover": "thumbnail/comic/[ふ][フクダーダ] 許嫁協定/[フクダーダ] 許嫁協定 第01巻/cover.jpg",
+              "name": "[フクダーダ] 許嫁協定 第01巻",
+              "note": ""
+            },
+            {
+              "path": "comic/[ふ][フクダーダ] 許嫁協定/[フクダーダ] 許嫁協定 第02巻",
+              "cover": "thumbnail/comic/[ふ][フクダーダ] 許嫁協定/[フクダーダ] 許嫁協定 第02巻/cover.jpg",
+              "name": "[フクダーダ] 許嫁協定 第02巻",
+              "note": ""
+            },
+            {
+              "path": "comic/[ふ][フクダーダ] 許嫁協定/[フクダーダ] 許嫁協定 第03巻",
+              "cover": "thumbnail/comic/[ふ][フクダーダ] 許嫁協定/[フクダーダ] 許嫁協定 第03巻/cover.jpg",
+              "name": "[フクダーダ] 許嫁協定 第03巻",
+              "note": ""
+            },
+            {
+              "path": "comic/[ふ][フクダーダ] 許嫁協定/[フクダーダ] 許嫁協定 第04巻",
+              "cover": "thumbnail/comic/[ふ][フクダーダ] 許嫁協定/[フクダーダ] 許嫁協定 第04巻/cover.jpg",
+              "name": "[フクダーダ] 許嫁協定 第04巻",
+              "note": ""
+            },
+            {
+              "path": "comic/[ふ][フクダーダ] 許嫁協定/[フクダーダ] 許嫁協定 第05巻",
+              "cover": "thumbnail/comic/[ふ][フクダーダ] 許嫁協定/[フクダーダ] 許嫁協定 第05巻/cover.jpg",
+              "name": "[フクダーダ] 許嫁協定 第05巻",
+              "note": ""
+            },
+            {
+              "path": "comic/[ふ][フクダーダ] 許嫁協定/[フクダーダ] 許嫁協定 第06巻",
+              "cover": "thumbnail/comic/[ふ][フクダーダ] 許嫁協定/[フクダーダ] 許嫁協定 第06巻/cover.jpg",
+              "name": "[フクダーダ] 許嫁協定 第06巻",
+              "note": ""
+            },
+            {
+              "path": "comic/[ふ][フクダーダ] 許嫁協定/[フクダーダ] 許嫁協定 第07巻",
+              "cover": "thumbnail/comic/[ふ][フクダーダ] 許嫁協定/[フクダーダ] 許嫁協定 第07巻/cover.jpg",
+              "name": "[フクダーダ] 許嫁協定 第07巻",
+              "note": ""
+            },
+            {
+              "path": "comic/[ふ][フクダーダ] 許嫁協定/[フクダーダ] 許嫁協定 第08巻",
+              "cover": "thumbnail/comic/[ふ][フクダーダ] 許嫁協定/[フクダーダ] 許嫁協定 第08巻/cover.jpg",
+              "name": "[フクダーダ] 許嫁協定 第08巻",
+              "note": ""
+            },
+            {
+              "path": "comic/[ふ][フクダーダ] 許嫁協定/[フクダーダ] 許嫁協定 第09巻",
+              "cover": "thumbnail/comic/[ふ][フクダーダ] 許嫁協定/[フクダーダ] 許嫁協定 第09巻/cover.jpg",
+              "name": "[フクダーダ] 許嫁協定 第09巻",
+              "note": ""
+            },
+            {
+              "path": "comic/[ふ][フクダーダ] 許嫁協定/[フクダーダ] 許嫁協定 第10巻",
+              "cover": "thumbnail/comic/[ふ][フクダーダ] 許嫁協定/[フクダーダ] 許嫁協定 第10巻/cover.jpg",
+              "name": "[フクダーダ] 許嫁協定 第10巻",
+              "note": ""
+            },
+            {
+              "path": "comic/[ふ][フクダーダ] 許嫁協定/[フクダーダ] 許嫁協定 第11巻(終)",
+              "cover": "thumbnail/comic/[ふ][フクダーダ] 許嫁協定/[フクダーダ] 許嫁協定 第11巻(終)/cover.jpg",
+              "name": "[フクダーダ] 許嫁協定 第11巻(終)",
+              "note": ""
+            }
+          ],
+          "exturl": []
+        },
+        "[ふ][福地カミオ] よわよわ先生": {
+          "path": "comic/[ふ][福地カミオ] よわよわ先生",
+          "name": "[ふ][福地カミオ] よわよわ先生",
+          "series": "xdf1bed9a",
+          "main-person": "",
+          "persons": [],
+          "labels": [],
+          "note": "",
+          "cover": "",
+          "contents": [
+            {
+              "path": "comic/[ふ][福地カミオ] よわよわ先生/[福地カミオ] よわよわ先生 第01巻_pdf",
+              "cover": "thumbnail/comic/[ふ][福地カミオ] よわよわ先生/[福地カミオ] よわよわ先生 第01巻_pdf/cover.jpg",
+              "name": "[福地カミオ] よわよわ先生 第01巻_pdf",
+              "note": ""
+            },
+            {
+              "path": "comic/[ふ][福地カミオ] よわよわ先生/[福地カミオ] よわよわ先生 第02巻_pdf",
+              "cover": "thumbnail/comic/[ふ][福地カミオ] よわよわ先生/[福地カミオ] よわよわ先生 第02巻_pdf/cover.jpg",
+              "name": "[福地カミオ] よわよわ先生 第02巻_pdf",
+              "note": ""
+            },
+            {
+              "path": "comic/[ふ][福地カミオ] よわよわ先生/[福地カミオ] よわよわ先生 第03巻_pdf",
+              "cover": "thumbnail/comic/[ふ][福地カミオ] よわよわ先生/[福地カミオ] よわよわ先生 第03巻_pdf/cover.jpg",
+              "name": "[福地カミオ] よわよわ先生 第03巻_pdf",
+              "note": ""
+            },
+            {
+              "path": "comic/[ふ][福地カミオ] よわよわ先生/[福地カミオ] よわよわ先生 第04巻_pdf",
+              "cover": "thumbnail/comic/[ふ][福地カミオ] よわよわ先生/[福地カミオ] よわよわ先生 第04巻_pdf/cover.jpg",
+              "name": "[福地カミオ] よわよわ先生 第04巻_pdf",
+              "note": ""
+            },
+            {
+              "path": "comic/[ふ][福地カミオ] よわよわ先生/[福地カミオ] よわよわ先生 第05巻_pdf",
+              "cover": "thumbnail/comic/[ふ][福地カミオ] よわよわ先生/[福地カミオ] よわよわ先生 第05巻_pdf/cover.jpg",
+              "name": "[福地カミオ] よわよわ先生 第05巻_pdf",
+              "note": ""
+            },
+            {
+              "path": "comic/[ふ][福地カミオ] よわよわ先生/[福地カミオ] よわよわ先生 第06巻_pdf",
+              "cover": "thumbnail/comic/[ふ][福地カミオ] よわよわ先生/[福地カミオ] よわよわ先生 第06巻_pdf/cover.jpg",
+              "name": "[福地カミオ] よわよわ先生 第06巻_pdf",
+              "note": ""
+            },
+            {
+              "path": "comic/[ふ][福地カミオ] よわよわ先生/[福地カミオ] よわよわ先生 第07巻_pdf",
+              "cover": "thumbnail/comic/[ふ][福地カミオ] よわよわ先生/[福地カミオ] よわよわ先生 第07巻_pdf/cover.jpg",
+              "name": "[福地カミオ] よわよわ先生 第07巻_pdf",
+              "note": ""
+            },
+            {
+              "path": "comic/[ふ][福地カミオ] よわよわ先生/[福地カミオ] よわよわ先生 第08巻_pdf",
+              "cover": "thumbnail/comic/[ふ][福地カミオ] よわよわ先生/[福地カミオ] よわよわ先生 第08巻_pdf/cover.jpg",
+              "name": "[福地カミオ] よわよわ先生 第08巻_pdf",
+              "note": ""
+            },
+            {
+              "path": "comic/[ふ][福地カミオ] よわよわ先生/[福地カミオ] よわよわ先生 第09巻_pdf",
+              "cover": "thumbnail/comic/[ふ][福地カミオ] よわよわ先生/[福地カミオ] よわよわ先生 第09巻_pdf/cover.jpg",
+              "name": "[福地カミオ] よわよわ先生 第09巻_pdf",
+              "note": ""
+            },
+            {
+              "path": "comic/[ふ][福地カミオ] よわよわ先生/[福地カミオ] よわよわ先生 第10巻_pdf",
+              "cover": "thumbnail/comic/[ふ][福地カミオ] よわよわ先生/[福地カミオ] よわよわ先生 第10巻_pdf/cover.jpg",
+              "name": "[福地カミオ] よわよわ先生 第10巻_pdf",
+              "note": ""
+            },
+            {
+              "path": "comic/[ふ][福地カミオ] よわよわ先生/[福地カミオ] よわよわ先生 第11巻_pdf",
+              "cover": "thumbnail/comic/[ふ][福地カミオ] よわよわ先生/[福地カミオ] よわよわ先生 第11巻_pdf/cover.jpg",
+              "name": "[福地カミオ] よわよわ先生 第11巻_pdf",
+              "note": ""
+            },
+            {
+              "path": "comic/[ふ][福地カミオ] よわよわ先生/[福地カミオ] よわよわ先生 第12巻_pdf",
+              "cover": "thumbnail/comic/[ふ][福地カミオ] よわよわ先生/[福地カミオ] よわよわ先生 第12巻_pdf/cover.jpg",
+              "name": "[福地カミオ] よわよわ先生 第12巻_pdf",
+              "note": ""
+            },
+            {
+              "path": "comic/[ふ][福地カミオ] よわよわ先生/[福地カミオ] よわよわ先生 第13巻_pdf",
+              "cover": "thumbnail/comic/[ふ][福地カミオ] よわよわ先生/[福地カミオ] よわよわ先生 第13巻_pdf/cover.jpg",
+              "name": "[福地カミオ] よわよわ先生 第13巻_pdf",
+              "note": ""
+            },
+            {
+              "path": "comic/[ふ][福地カミオ] よわよわ先生/[福地カミオ] よわよわ先生 第14巻_pdf",
+              "cover": "thumbnail/comic/[ふ][福地カミオ] よわよわ先生/[福地カミオ] よわよわ先生 第14巻_pdf/cover.jpg",
+              "name": "[福地カミオ] よわよわ先生 第14巻_pdf",
+              "note": ""
+            }
+          ],
+          "exturl": []
+        }
+      }
+    },
+    "photo": {
+      "name": "写真集",
+      "path": "photo",
+      "entries": {
+        "[うんぱい][20220628] uP": {
+          "path": "photo/[うんぱい][20220628] uP",
+          "name": "[うんぱい][20220628] uP",
+          "series": "20220628-up",
+          "main-person": "",
+          "persons": [],
+          "labels": [],
+          "note": "",
+          "cover": "",
+          "contents": [
+            {
+              "path": "photo/[うんぱい][20220628] uP",
+              "cover": "thumbnail/photo/[うんぱい][20220628] uP/cover.jpg",
+              "name": "[うんぱい][20220628] uP",
+              "note": ""
+            }
+          ],
+          "exturl": []
+        }
+      }
+    }
+  }
+}

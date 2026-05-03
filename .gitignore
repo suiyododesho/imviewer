@@ -24,3 +24,4 @@ site/js/structure.js
 # content_add workspaces (copies of tools/content_add/workspace/ for each server)
 tools/content_add/*/
 !tools/content_add/workspace/
+tests/contents/*

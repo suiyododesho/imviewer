@@ -475,13 +475,13 @@ class MaintBuildStructureTests(unittest.TestCase):
 
         self.assertEqual(rc, 0)
         mock_structure.assert_called_once_with(["--sync"])
-        mock_extract.assert_called_once_with()
-        mock_thumbs.assert_called_once_with()
-        mock_covers.assert_called_once_with()
-        mock_structure_js.assert_called_once_with()
-        mock_gallery_pages.assert_called_once_with()
-        mock_site_config.assert_called_once_with()
-        mock_history.assert_called_once_with()
+        mock_extract.assert_called_once_with([])
+        mock_thumbs.assert_called_once_with([])
+        mock_covers.assert_called_once_with([])
+        mock_structure_js.assert_called_once_with([])
+        mock_gallery_pages.assert_called_once_with([])
+        mock_site_config.assert_called_once_with([])
+        mock_history.assert_called_once_with([])
 
     def test_build_gallery_pages_map_plan_mode_does_not_execute_steps(self):
         with tempfile.TemporaryDirectory() as tmp:

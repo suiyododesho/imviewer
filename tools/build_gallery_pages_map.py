@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import inspect
 import os
 
 try:
@@ -36,6 +37,13 @@ def parse_args(argv=None):
     parser.add_argument('--dry-run', action='store_true', help='Alias of --plan')
     parser.add_argument('--metrics-log', default='', help='Optional JSONL output path for metrics log')
     return parser.parse_args(argv)
+
+
+def _invoke_step(func, step_args):
+    signature = inspect.signature(func)
+    if len(signature.parameters) >= 1:
+        return func(step_args)
+    return func()
 
 
 def main(argv=None) -> int:
@@ -86,7 +94,7 @@ def main(argv=None) -> int:
 
     for name, func, step_args in steps:
         token = metrics.begin_stage(name, monitor_paths, {'args': step_args})
-        rc = func(step_args) if step_args else func()
+        rc = _invoke_step(func, step_args)
         if rc:
             metrics.end_stage(token, status='failed', details={'exit_code': rc})
             metrics.finalize(success=False)

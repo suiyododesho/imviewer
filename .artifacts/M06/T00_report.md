@@ -3,7 +3,7 @@
 ## Scope
 - Implemented only T00 (measurement foundation).
 - Added plan/dry-run flow first.
-- Did not execute apply operations for UC1/UC2 in reporting runs.
+- Executed UC1/UC2 apply after approval and appended measured logs.
 
 ## Changed Files
 - tools/maint_metrics.py
@@ -66,6 +66,35 @@ Log:
 - stage breakdown:
   - load_csv: duration_ms=1, scanned_count=3
   - apply_metadata_to_structure: duration_ms=55, scanned_count=3, changed=0
+
+## Measurement Results (Apply with before/after compare)
+### UC1 apply
+Commands:
+
+```powershell
+d:/Tool/_mytool/imviewer/.venv/Scripts/python.exe tools/build_gallery_pages_map.py --metrics-log .artifacts/M06/metrics/t00_uc1_apply.jsonl
+d:/Tool/_mytool/imviewer/.venv/Scripts/python.exe tools/build_gallery_pages_map.py --metrics-log .artifacts/M06/metrics/t00_uc1_apply.jsonl
+```
+
+Log:
+- .artifacts/M06/metrics/t00_uc1_apply.jsonl
+- 1st apply totals: duration_ms=45043, scanned_count=84782, generated_count=348, transfer_files=348, transfer_bytes=54261873
+- 2nd apply totals: duration_ms=12281, scanned_count=85640, generated_count=5, transfer_files=5, transfer_bytes=171566
+- compare (2nd vs 1st): delta_duration_ms=-32762, delta_generated_count=-343, delta_transfer_files=-343, delta_transfer_bytes=-54090307
+
+### UC2 apply
+Commands:
+
+```powershell
+d:/Tool/_mytool/imviewer/.venv/Scripts/python.exe tools/maint_metadata.py apply --input tools/metadata.csv --metrics-log .artifacts/M06/metrics/t00_uc2_apply.jsonl
+d:/Tool/_mytool/imviewer/.venv/Scripts/python.exe tools/maint_metadata.py apply --input tools/metadata.csv --metrics-log .artifacts/M06/metrics/t00_uc2_apply.jsonl
+```
+
+Log:
+- .artifacts/M06/metrics/t00_uc2_apply.jsonl
+- 1st apply totals: duration_ms=1, scanned_count=6, generated_count=0, transfer_files=0, transfer_bytes=0
+- 2nd apply totals: duration_ms=0, scanned_count=6, generated_count=0, transfer_files=0, transfer_bytes=0
+- compare (2nd vs 1st): delta_duration_ms=-1, delta_generated_count=0, delta_transfer_files=0, delta_transfer_bytes=0
 
 ## Tasks.md Reflection
 - T00-01: completed

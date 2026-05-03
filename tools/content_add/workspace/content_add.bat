@@ -12,10 +12,21 @@ set "PYTHON_EXE=!ROOT_DIR!\.venv\Scripts\python.exe"
 set "CONFIG_FILE=!WORKSPACE_DIR!\content_add_config.json"
 set "IMVIEWER_SITE_DIR=!WORKSPACE_DIR!"
 
+:: Parse arguments (--diff: incremental mode using history.txt targets)
+set "DIFF_FLAG="
+:parse_args
+if "%~1"=="--diff" (
+    set "DIFF_FLAG=--diff"
+    shift
+    goto :parse_args
+)
+
 echo.
 echo ========================================
 echo  content_add tool
 echo ========================================
+echo.
+if "!DIFF_FLAG!"=="--diff" (echo  Mode: DIFF ^(incremental^)) else (echo  Mode: FULL)
 echo.
 
 if not exist "!PYTHON_EXE!" (
@@ -95,7 +106,7 @@ echo.
 
 echo [2-3] Generate gallery thumbnails...
 pushd "!ROOT_DIR!" >nul
-"!PYTHON_EXE!" "!TOOLS_DIR!\maint_build_gallery_thumbnails.py"
+"!PYTHON_EXE!" "!TOOLS_DIR!\maint_build_gallery_thumbnails.py" !DIFF_FLAG!
 set "RC=!ERRORLEVEL!"
 popd >nul
 if not "!RC!"=="0" (
@@ -127,7 +138,7 @@ if not "!RC!"=="0" (
 
 echo [2-6] Generate JS files (gallery-pages.js)...
 pushd "!ROOT_DIR!" >nul
-"!PYTHON_EXE!" "!TOOLS_DIR!\maint_build_gallery_pages.py"
+"!PYTHON_EXE!" "!TOOLS_DIR!\maint_build_gallery_pages.py" !DIFF_FLAG!
 set "RC=!ERRORLEVEL!"
 popd >nul
 if not "!RC!"=="0" (

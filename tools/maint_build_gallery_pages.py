@@ -524,7 +524,7 @@ def build_gallery_pages_map(structure: dict, diff: bool = False, generate_thumbn
     all_gallery_paths = list(iter_gallery_paths(structure))
     target_gallery_paths = list(all_gallery_paths)
     result = {}
-    metadata = {"incremental_mode": False, "generated": 0, "reused": 0}
+    metadata = {"incremental_mode": False, "generated": 0, "reused": 0, "skipped": False}
 
     if diff:
         history_data = parse_history(HISTORY_PATH)
@@ -537,6 +537,14 @@ def build_gallery_pages_map(structure: dict, diff: bool = False, generate_thumbn
             metadata["incremental_mode"] = True
             detected = detect_changed_gallery_paths(all_gallery_paths, result)
             target_gallery_paths = sorted(set(selected) | set(detected))
+            if not target_gallery_paths:
+                # T01-03: No diff targets after all checks. Skip generation loop and JS write.
+                metadata["skipped"] = True
+                metadata["gallery_count"] = len(result)
+                metadata["page_count"] = sum(count_gallery_pages_entry(v) for v in result.values())
+                return result, metadata
+        else:
+            target_gallery_paths = sorted(set(selected))
 
     thumb_generated = 0
     thumb_reused = 0
@@ -568,7 +576,7 @@ def verify_gallery_map_count(structure: dict, map_data: dict) -> tuple[bool, int
 def generate_gallery_thumbnails(structure: dict, diff: bool = False) -> dict:
     all_gallery_paths = list(iter_gallery_paths(structure))
     target_gallery_paths = list(all_gallery_paths)
-    metadata = {"incremental_mode": False, "generated": 0, "reused": 0}
+    metadata = {"incremental_mode": False, "generated": 0, "reused": 0, "skipped": False}
 
     if diff:
         history_data = parse_history(HISTORY_PATH)
@@ -576,6 +584,11 @@ def generate_gallery_thumbnails(structure: dict, diff: bool = False) -> dict:
         selected = select_gallery_paths_for_diff(all_gallery_paths, history_targets)
         target_gallery_paths = selected
         metadata["incremental_mode"] = True
+        if not history_targets:
+            # T01-03: No history targets → 0 diff targets. Skip heavy processing.
+            metadata["skipped"] = True
+            metadata["gallery_count"] = 0
+            return metadata
 
     thumb_generated = 0
     thumb_reused = 0
@@ -608,6 +621,10 @@ def main(argv=None) -> int:
     diff_mode = args.diff and not args.full
     structure = load_structure(STRUCTURE_JSON_PATH)
     result, metadata = build_gallery_pages_map(structure, diff=diff_mode, generate_thumbnails=False)
+    if metadata.get("skipped"):
+        print("No diff targets (history.txt empty). Skipped gallery-pages rebuild. Existing map kept.")
+        print(f"Galleries: {metadata['gallery_count']}, pages: {metadata['page_count']}")
+        return 0
     write_gallery_pages_js(result)
     print(f"Generated {GALLERY_PAGES_PATH}")
     print(f"Galleries: {metadata['gallery_count']}, pages: {metadata['page_count']}")

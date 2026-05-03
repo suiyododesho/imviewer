@@ -24,6 +24,9 @@ def main(argv=None) -> int:
     diff_mode = args.diff and not args.full
     structure = load_structure()
     metadata = generate_gallery_thumbnails(structure, diff=diff_mode)
+    if metadata.get("skipped"):
+        print("No diff targets (history.txt empty). Skipped gallery thumbnail generation.")
+        return 0
     print(f"Gallery thumbnail targets: {metadata['gallery_count']}")
     print(f"Gallery thumbnails: generated={metadata['generated']}, reused={metadata['reused']}")
     return 0

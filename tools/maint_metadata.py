@@ -227,6 +227,7 @@ def cmd_apply(args: argparse.Namespace) -> None:
 
     changed = 0
     not_found = 0
+    path_changed = False
 
     for (genre_key, entry_key), row in rows_by_key.items():
         genre_data = genres_map.get(genre_key)
@@ -262,6 +263,8 @@ def cmd_apply(args: argparse.Namespace) -> None:
                     else:
                         entry_data[field] = csv_val
                     entry_changed = True
+                    if field == "path":
+                        path_changed = True
 
         if entry_changed:
             changed += 1
@@ -306,22 +309,29 @@ def cmd_apply(args: argparse.Namespace) -> None:
                 transfer_bytes += os.path.getsize(structure_path)
             try:
                 write_structure_js(structure)
-                ok, detail = _regenerate_gallery_pages_js()
                 if os.path.isfile(structure_js_path):
                     transfer_files += 1
                     transfer_bytes += os.path.getsize(structure_js_path)
-                if os.path.isfile(gallery_pages_path):
-                    transfer_files += 1
-                    transfer_bytes += os.path.getsize(gallery_pages_path)
-                if ok:
-                    print(
-                        f"Applied: {changed} entries updated, {not_found} not found. "
-                        "Saved to structure.json and regenerated site/js/structure.js + site/js/gallery-pages.js."
-                    )
+                if path_changed:
+                    ok, detail = _regenerate_gallery_pages_js()
+                    if os.path.isfile(gallery_pages_path):
+                        transfer_files += 1
+                        transfer_bytes += os.path.getsize(gallery_pages_path)
+                    if ok:
+                        print(
+                            f"Applied: {changed} entries updated, {not_found} not found. "
+                            "Saved to structure.json and regenerated site/js/structure.js + site/js/gallery-pages.js."
+                        )
+                    else:
+                        print(
+                            f"Applied: {changed} entries updated, {not_found} not found. "
+                            f"Saved to structure.json and regenerated site/js/structure.js. (gallery-pages.js regen failed: {detail})"
+                        )
                 else:
                     print(
                         f"Applied: {changed} entries updated, {not_found} not found. "
-                        f"Saved to structure.json and regenerated site/js/structure.js. (gallery-pages.js regen failed: {detail})"
+                        "Saved to structure.json and regenerated site/js/structure.js. "
+                        "(gallery-pages.js skipped: no path changes)"
                     )
             except Exception as exc:
                 print(f"Applied: {changed} entries updated, {not_found} not found. Saved to structure.json. (structure.js regen failed: {exc})")
@@ -336,7 +346,7 @@ def cmd_apply(args: argparse.Namespace) -> None:
             generated_count=changed,
             transfer_files=transfer_files,
             transfer_bytes=transfer_bytes,
-            details={"changed": changed},
+            details={"changed": changed, "path_changed": path_changed, "gallery_pages_skipped": not path_changed},
         )
         payload = metrics.finalize(success=True)
         print(f"Metrics log: {metrics.log_path}")

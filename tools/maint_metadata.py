@@ -27,6 +27,7 @@ import sys
 import re
 import unicodedata
 import hashlib
+import time
 
 try:
     from .maint_structure_lib import (
@@ -36,6 +37,7 @@ try:
         save_structure,
         write_structure_js,
     )
+    from .maint_metrics import RunMetrics
 except ImportError:
     from maint_structure_lib import (
         get_genres_map,
@@ -44,6 +46,7 @@ except ImportError:
         save_structure,
         write_structure_js,
     )
+    from maint_metrics import RunMetrics
 
 # ── CSV layout ────────────────────────────────────────────────────────────────
 CSV_COLUMNS = ["genre", "entry_key", "name", "main-person", "persons", "labels", "note"]
@@ -125,6 +128,12 @@ def _regenerate_gallery_pages_js() -> tuple[bool, str]:
 # ── export ────────────────────────────────────────────────────────────────────
 
 def cmd_export(args: argparse.Namespace) -> None:
+    metrics = RunMetrics(
+        pipeline="uc2-metadata-export",
+        mode="apply",
+        log_path=args.metrics_log or None,
+    )
+    started = time.perf_counter()
     structure = load_structure()
     output_path = args.output
 
@@ -152,7 +161,20 @@ def cmd_export(args: argparse.Namespace) -> None:
         writer.writeheader()
         writer.writerows(rows)
 
+    metrics.add_stage(
+        name="metadata_export",
+        status="ok",
+        duration_ms=int((time.perf_counter() - started) * 1000),
+        scanned_count=len(rows),
+        generated_count=len(rows),
+        transfer_files=1,
+        transfer_bytes=os.path.getsize(output_path) if os.path.isfile(output_path) else 0,
+        details={"output": output_path},
+    )
+    metrics.finalize(success=True)
+
     print(f"Exported {len(rows)} entries to: {output_path}")
+    print(f"Metrics log: {metrics.log_path}")
 
 
 # ── apply ─────────────────────────────────────────────────────────────────────
@@ -160,12 +182,18 @@ def cmd_export(args: argparse.Namespace) -> None:
 def cmd_apply(args: argparse.Namespace) -> None:
     input_path = args.input
     dry_run: bool = args.dry_run
+    metrics = RunMetrics(
+        pipeline="uc2-metadata-apply",
+        mode="plan" if dry_run else "apply",
+        log_path=args.metrics_log or None,
+    )
 
     if not os.path.isfile(input_path):
         print(f"ERROR: Input file not found: {input_path}", file=sys.stderr)
         sys.exit(1)
 
     # Load CSV
+    load_started = time.perf_counter()
     rows_by_key: dict[tuple[str, str], dict[str, str]] = {}
     with open(input_path, "r", newline="", encoding="utf-8-sig") as f:
         reader = csv.DictReader(f)
@@ -181,8 +209,19 @@ def cmd_apply(args: argparse.Namespace) -> None:
                 series_val = _slugify_to_ascii((row.get("name") or "").strip())
             row["series"] = series_val
             rows_by_key[(genre, entry_key)] = row
+    metrics.add_stage(
+        name="load_csv",
+        status="ok",
+        duration_ms=int((time.perf_counter() - load_started) * 1000),
+        scanned_count=len(rows_by_key),
+        generated_count=0,
+        transfer_files=0,
+        transfer_bytes=0,
+        details={"input": input_path},
+    )
 
     # Load structure
+    apply_started = time.perf_counter()
     structure = load_structure()
     genres_map = get_genres_map(structure)
 
@@ -227,14 +266,53 @@ def cmd_apply(args: argparse.Namespace) -> None:
         if entry_changed:
             changed += 1
 
+    metrics.add_stage(
+        name="apply_metadata_to_structure",
+        status="ok",
+        duration_ms=int((time.perf_counter() - apply_started) * 1000),
+        scanned_count=len(rows_by_key),
+        generated_count=changed,
+        transfer_files=0,
+        transfer_bytes=0,
+        details={"changed": changed, "not_found": not_found},
+    )
+
     if dry_run:
         print(f"\nDry-run complete: {changed} entries would be updated, {not_found} not found.")
+        payload = metrics.finalize(success=True)
+        print(f"Metrics log: {metrics.log_path}")
+        if payload.get("compare"):
+            compare = payload["compare"]
+            print(
+                "Compare(previous): "
+                f"duration_ms={compare['delta_duration_ms']}, "
+                f"generated={compare['delta_generated_count']}, "
+                f"transfer_files={compare['delta_transfer_files']}, "
+                f"transfer_bytes={compare['delta_transfer_bytes']}"
+            )
     else:
+        save_started = time.perf_counter()
+        transfer_files = 0
+        transfer_bytes = 0
         if changed:
             save_structure(structure)
+            root_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+            structure_path = os.path.join(root_dir, "site", "structure.json")
+            structure_js_path = os.path.join(root_dir, "site", "js", "structure.js")
+            gallery_pages_path = os.path.join(root_dir, "site", "js", "gallery-pages.js")
+
+            if os.path.isfile(structure_path):
+                transfer_files += 1
+                transfer_bytes += os.path.getsize(structure_path)
             try:
                 write_structure_js(structure)
                 ok, detail = _regenerate_gallery_pages_js()
+                if os.path.isfile(structure_js_path):
+                    transfer_files += 1
+                    transfer_bytes += os.path.getsize(structure_js_path)
+                if os.path.isfile(gallery_pages_path):
+                    transfer_files += 1
+                    transfer_bytes += os.path.getsize(gallery_pages_path)
                 if ok:
                     print(
                         f"Applied: {changed} entries updated, {not_found} not found. "
@@ -250,6 +328,28 @@ def cmd_apply(args: argparse.Namespace) -> None:
         else:
             print(f"No changes detected. ({not_found} not found)")
 
+        metrics.add_stage(
+            name="persist_and_regenerate",
+            status="ok",
+            duration_ms=int((time.perf_counter() - save_started) * 1000),
+            scanned_count=changed,
+            generated_count=changed,
+            transfer_files=transfer_files,
+            transfer_bytes=transfer_bytes,
+            details={"changed": changed},
+        )
+        payload = metrics.finalize(success=True)
+        print(f"Metrics log: {metrics.log_path}")
+        if payload.get("compare"):
+            compare = payload["compare"]
+            print(
+                "Compare(previous): "
+                f"duration_ms={compare['delta_duration_ms']}, "
+                f"generated={compare['delta_generated_count']}, "
+                f"transfer_files={compare['delta_transfer_files']}, "
+                f"transfer_bytes={compare['delta_transfer_bytes']}"
+            )
+
 
 # ── CLI ───────────────────────────────────────────────────────────────────────
 
@@ -258,7 +358,7 @@ def _default_csv_path() -> str:
     return os.path.join(tools_dir, "metadata.csv")
 
 
-def main() -> None:
+def main(argv=None) -> None:
     parser = argparse.ArgumentParser(
         description="Export/apply entry metadata (labels, persons, etc.) via CSV."
     )
@@ -271,6 +371,12 @@ def main() -> None:
         default=_default_csv_path(),
         metavar="FILE",
         help="Output CSV path (default: tools/metadata.csv)",
+    )
+    p_export.add_argument(
+        "--metrics-log",
+        default="",
+        metavar="FILE",
+        help="Optional JSONL output path for metrics log",
     )
 
     # apply
@@ -286,11 +392,35 @@ def main() -> None:
         action="store_true",
         help="Preview changes without writing to structure.json",
     )
+    p_apply.add_argument(
+        "--metrics-log",
+        default="",
+        metavar="FILE",
+        help="Optional JSONL output path for metrics log",
+    )
 
-    args = parser.parse_args()
+    # plan (alias to apply --dry-run)
+    p_plan = sub.add_parser("plan", help="Preview apply result without writing")
+    p_plan.add_argument(
+        "--input", "-i",
+        default=_default_csv_path(),
+        metavar="FILE",
+        help="Input CSV path (default: tools/metadata.csv)",
+    )
+    p_plan.add_argument(
+        "--metrics-log",
+        default="",
+        metavar="FILE",
+        help="Optional JSONL output path for metrics log",
+    )
+
+    args = parser.parse_args(argv)
     if args.command == "export":
         cmd_export(args)
     elif args.command == "apply":
+        cmd_apply(args)
+    elif args.command == "plan":
+        args.dry_run = True
         cmd_apply(args)
 
 

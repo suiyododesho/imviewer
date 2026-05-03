@@ -28,6 +28,7 @@ import re
 import unicodedata
 import hashlib
 import time
+from pathlib import Path
 
 try:
     from .maint_structure_lib import (
@@ -66,6 +67,36 @@ def _list_to_csv(values: list) -> str:
 def _csv_to_list(cell: str) -> list[str]:
     """Decode a semicolon-delimited cell value to a list of strings."""
     return [v.strip() for v in cell.split(LIST_SEP) if v.strip()]
+
+
+def _norm_rel(path: str) -> str:
+    return str(path or "").replace("\\", "/").strip().strip("/")
+
+
+def _load_diff_targets(path: str) -> set[str]:
+    p = Path(path)
+    if not p.is_file():
+        return set()
+    values = {
+        _norm_rel(line)
+        for line in p.read_text(encoding="utf-8").splitlines()
+        if _norm_rel(line)
+    }
+    return values
+
+
+def _matches_diff_target(series_path: str, targets: set[str]) -> bool:
+    normalized_series_path = _norm_rel(series_path)
+    if not targets:
+        return True
+    for target in targets:
+        if (
+            normalized_series_path == target
+            or normalized_series_path.startswith(target + "/")
+            or target.startswith(normalized_series_path + "/")
+        ):
+            return True
+    return False
 
 
 def _slugify_to_ascii(text: str) -> str:
@@ -228,6 +259,8 @@ def cmd_apply(args: argparse.Namespace) -> None:
     changed = 0
     not_found = 0
     path_changed = False
+    skipped_by_diff = 0
+    diff_targets = _load_diff_targets(args.diff_targets_file) if getattr(args, "diff_targets_file", "") else set()
 
     for (genre_key, entry_key), row in rows_by_key.items():
         genre_data = genres_map.get(genre_key)
@@ -241,6 +274,10 @@ def cmd_apply(args: argparse.Namespace) -> None:
         if entry_data is None:
             print(f"  WARNING: entry '{entry_key}' not found in genre '{genre_key}'")
             not_found += 1
+            continue
+
+        if diff_targets and not _matches_diff_target(str(entry_data.get("path", "")), diff_targets):
+            skipped_by_diff += 1
             continue
 
         entry_changed = False
@@ -281,7 +318,10 @@ def cmd_apply(args: argparse.Namespace) -> None:
     )
 
     if dry_run:
-        print(f"\nDry-run complete: {changed} entries would be updated, {not_found} not found.")
+        print(
+            f"\nDry-run complete: {changed} entries would be updated, "
+            f"{not_found} not found, {skipped_by_diff} skipped by diff filter."
+        )
         payload = metrics.finalize(success=True)
         print(f"Metrics log: {metrics.log_path}")
         if payload.get("compare"):
@@ -319,24 +359,24 @@ def cmd_apply(args: argparse.Namespace) -> None:
                         transfer_bytes += os.path.getsize(gallery_pages_path)
                     if ok:
                         print(
-                            f"Applied: {changed} entries updated, {not_found} not found. "
+                            f"Applied: {changed} entries updated, {not_found} not found, {skipped_by_diff} skipped by diff filter. "
                             "Saved to structure.json and regenerated site/js/structure.js + site/js/gallery-pages.js."
                         )
                     else:
                         print(
-                            f"Applied: {changed} entries updated, {not_found} not found. "
+                            f"Applied: {changed} entries updated, {not_found} not found, {skipped_by_diff} skipped by diff filter. "
                             f"Saved to structure.json and regenerated site/js/structure.js. (gallery-pages.js regen failed: {detail})"
                         )
                 else:
                     print(
-                        f"Applied: {changed} entries updated, {not_found} not found. "
+                        f"Applied: {changed} entries updated, {not_found} not found, {skipped_by_diff} skipped by diff filter. "
                         "Saved to structure.json and regenerated site/js/structure.js. "
                         "(gallery-pages.js skipped: no path changes)"
                     )
             except Exception as exc:
                 print(f"Applied: {changed} entries updated, {not_found} not found. Saved to structure.json. (structure.js regen failed: {exc})")
         else:
-            print(f"No changes detected. ({not_found} not found)")
+            print(f"No changes detected. ({not_found} not found, {skipped_by_diff} skipped by diff filter)")
 
         metrics.add_stage(
             name="persist_and_regenerate",
@@ -346,7 +386,14 @@ def cmd_apply(args: argparse.Namespace) -> None:
             generated_count=changed,
             transfer_files=transfer_files,
             transfer_bytes=transfer_bytes,
-            details={"changed": changed, "path_changed": path_changed, "gallery_pages_skipped": not path_changed},
+            details={
+                "changed": changed,
+                "path_changed": path_changed,
+                "gallery_pages_skipped": not path_changed,
+                "not_found": not_found,
+                "skipped_by_diff": skipped_by_diff,
+                "diff_targets_count": len(diff_targets),
+            },
         )
         payload = metrics.finalize(success=True)
         print(f"Metrics log: {metrics.log_path}")
@@ -408,6 +455,12 @@ def main(argv=None) -> None:
         metavar="FILE",
         help="Optional JSONL output path for metrics log",
     )
+    p_apply.add_argument(
+        "--diff-targets-file",
+        default="",
+        metavar="FILE",
+        help="Optional text file (one series path per line) to limit apply targets",
+    )
 
     # plan (alias to apply --dry-run)
     p_plan = sub.add_parser("plan", help="Preview apply result without writing")
@@ -422,6 +475,12 @@ def main(argv=None) -> None:
         default="",
         metavar="FILE",
         help="Optional JSONL output path for metrics log",
+    )
+    p_plan.add_argument(
+        "--diff-targets-file",
+        default="",
+        metavar="FILE",
+        help="Optional text file (one series path per line) to limit plan targets",
     )
 
     args = parser.parse_args(argv)

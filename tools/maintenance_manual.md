@@ -116,3 +116,128 @@ d:/Tool/_mytool/imviewer/.venv/Scripts/python.exe tools/maint_uc_cli.py rollback
 - site/history.txt の next.force_dirs に想定外エントリが入った場合は、そのエントリのみ削除して plan を再実行する
 - 長時間処理や失敗時は .artifacts/M06/state/t07-uc-cli-state.jsonl と .artifacts/M06/logs/ を確認して再開判断する
 
+---
+
+## 障害復旧手順（T09-03）
+
+### 障害種別と対応フロー
+
+#### 1. apply 途中失敗（ステップ実行エラー）
+
+**症状**: `apply` の実行中にステップ（t03/t04/t05 のどれか）が失敗し、終了コードが非ゼロになった。
+
+**確認手順**:
+
+```powershell
+# 最後の実行状態を確認
+Get-Content .artifacts\M06\state\t07-uc-cli-state.jsonl | Select-Object -Last 1 | ConvertFrom-Json
+
+# 失敗したステップのログを確認
+Get-ChildItem .artifacts\M06\logs\ | Sort-Object LastWriteTime -Descending | Select-Object -First 3
+```
+
+**復旧手順**:
+
+1. 失敗ステップのログを確認し、原因を特定する
+2. 原因が DB の不整合や部分書き込みの場合は rollback を実行する（→ メニュー **7**）
+3. rollback 後は plan を再実行し、差分を再確認してから apply し直す
+
+```powershell
+# rollback
+d:/Tool/_mytool/imviewer/.venv/Scripts/python.exe tools/maint_uc_cli.py rollback
+
+# 再確認
+d:/Tool/_mytool/imviewer/.venv/Scripts/python.exe tools/maint_uc_cli.py plan uc1
+
+# 再apply（問題解消後）
+d:/Tool/_mytool/imviewer/.venv/Scripts/python.exe tools/maint_uc_cli.py apply uc1 --approve
+```
+
+#### 2. NAS 同期切断（コピー中の接続失敗）
+
+**症状**: `maint_sync_nas.py apply` の実行中に接続が切れ、部分的にコピーが完了した状態になった。
+
+**確認手順**:
+
+```powershell
+# 最後の計測ログを確認
+Get-Content .artifacts\M06\metrics\t06-nas-sync.jsonl | Select-Object -Last 1 | ConvertFrom-Json
+```
+
+**復旧手順**:
+
+1. NAS の接続を回復する
+2. `plan` を再実行してコピー済み/未コピーを再スキャンする  
+   （コピー済みファイルはハッシュ一致で自動スキップされる）
+3. `apply` を再実行する
+
+```powershell
+# 再plan（自動差分検出）
+d:/Tool/_mytool/imviewer/.venv/Scripts/python.exe tools/maint_sync_nas.py plan --source site --dest <NAS_PATH>
+
+# 再apply
+d:/Tool/_mytool/imviewer/.venv/Scripts/python.exe tools/maint_sync_nas.py apply --source site --dest <NAS_PATH>
+```
+
+> **NAS同期は冪等設計**のため、切断後の再実行は安全です。コピー済みファイルを再転送することはありません。
+
+#### 3. CSV 不正入力（メタデータ反映失敗）
+
+**症状**: CSV の列名誤り・必須列欠損・文字コード誤りにより `maint_metadata.py` が意図通りに動作しなかった。
+
+**確認手順**:
+
+```powershell
+# plan で変更対象件数を確認（0件なら CSV が正しく読まれていない可能性）
+d:/Tool/_mytool/imviewer/.venv/Scripts/python.exe tools/maint_metadata.py plan --input tools/metadata.csv
+```
+
+**よくある問題と対処**:
+
+| 症状 | 確認ポイント | 対処 |
+|------|------------|------|
+| 更新対象が 0 件 | genre/entry_key 列が正しいか確認 | CSV を修正して再 plan |
+| 文字化け警告 | CSV のエンコーディングが UTF-8-BOM でない | Excel 保存時に「CSV UTF-8（BOM付き）」を選択 |
+| WARNING: genre '...' not found | structure.json のジャンルキーと一致しているか | genre 列の値を structure.json の genres キーに揃える |
+| persons/labels が空になる | セミコロン区切りの先頭・末尾に余分な `;` | `author-a;author-b` の形式を使う（前後に `;` 不要） |
+
+**復旧手順**:
+
+1. CSV を修正する（上表を参照）
+2. `plan` で変更対象件数を再確認する
+3. 問題がなければ `apply` を実行する
+
+```powershell
+d:/Tool/_mytool/imviewer/.venv/Scripts/python.exe tools/maint_uc_cli.py plan uc2
+d:/Tool/_mytool/imviewer/.venv/Scripts/python.exe tools/maint_uc_cli.py apply uc2 --approve
+```
+
+#### 4. validate のエラー / resume_hint 表示
+
+**症状**: `validate` を実行したら `"errors"` リストにパス不存在などが報告された。
+
+**確認手順**:
+
+```powershell
+d:/Tool/_mytool/imviewer/.venv/Scripts/python.exe tools/maint_uc_cli.py validate uc1
+# または
+d:/Tool/_mytool/imviewer/.venv/Scripts/python.exe tools/maint_uc_cli.py validate uc2
+```
+
+`"resume_hint"` に前回失敗の `run_id` が含まれている場合、未完了の apply が記録されている。
+
+**復旧手順**:
+
+1. `"errors"` リストの内容に従ってパスや設定を修正する
+2. 必要なら rollback で DB を安定状態に戻す
+3. plan → apply の順で再実行する
+
+### ロールバック目標時間
+
+| 操作 | 目標復旧時間 |
+|------|------------|
+| DB rollback のみ | 30 秒以内 |
+| plan 再実行 (UC1) | 5 秒以内 |
+| plan 再実行 (UC2) | 2 秒以内 |
+| NAS 再同期（差分のみ） | 転送量に依存、初回より大幅短縮 |
+

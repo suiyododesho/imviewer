@@ -473,51 +473,58 @@ def select_gallery_paths_for_diff(gallery_paths, target_dirs):
 
 
 def write_gallery_pages_js(result):
+    text = render_gallery_pages_js(result)
     os.makedirs(JS_DIR, exist_ok=True)
     with open(GALLERY_PAGES_PATH, 'w', encoding='utf-8', newline='\n') as out:
-        out.write('/**\n')
-        out.write(' * Auto-generated gallery pages map from site/structure.json.\n')
-        out.write(' * Do not edit manually.\n')
-        out.write(' */\n')
-        out.write('window.resolveGalleryPageEntries = window.resolveGalleryPageEntries || function resolveGalleryPageEntries(value, fallbackHtml) {\n')
-        out.write('  if (Array.isArray(value)) return value;\n')
-        out.write('  if (!value || !Array.isArray(value.p)) return [];\n')
-        out.write('  if (Array.isArray(value.__pages)) return value.__pages;\n')
-        out.write('  const normalize = (path) => String(path || "").replace(/\\\\/g, "/").replace(/^\\/+/, "");\n')
-        out.write('  const join = (base, path) => {\n')
-        out.write('    const normalizedPath = normalize(path);\n')
-        out.write('    if (!normalizedPath) return "";\n')
-        out.write('    if (normalizedPath.startsWith("contents/") || normalizedPath.startsWith("thumbnail/")) return normalizedPath;\n')
-        out.write('    const normalizedBase = normalize(base).replace(/\\/+$/, "");\n')
-        out.write('    return normalizedBase ? normalizedBase + "/" + normalizedPath : normalizedPath;\n')
-        out.write('  };\n')
-        out.write('  const stem = (path) => {\n')
-        out.write('    const normalizedPath = normalize(path);\n')
-        out.write('    const fileName = normalizedPath.split("/").pop() || normalizedPath;\n')
-        out.write('    return fileName.replace(/\\.[^.]+$/, "");\n')
-        out.write('  };\n')
-        out.write('  const ext = (path) => {\n')
-        out.write('    const match = /\\.([^.]+)$/.exec(String(path || ""));\n')
-        out.write('    return match ? match[1].toLowerCase() : "";\n')
-        out.write('  };\n')
-        out.write('  const base = value.b || "";\n')
-        out.write('  const thumbBase = value.t || "";\n')
-        out.write('  const html = join("", fallbackHtml || "");\n')
-        out.write('  value.__pages = value.p.map((item) => {\n')
-        out.write('    if (!Array.isArray(item) || item.length === 0) return null;\n')
-        out.write('    if (item[0] === "v") {\n')
-        out.write('      const video = join(base, item[1]);\n')
-        out.write('      return { type: "video", video, html, thumbNumber: Number(item[2]) > 0 ? Number(item[2]) : null, label: item[3] || stem(item[1] || video), ext: String(item[4] || ext(item[1] || video)).toLowerCase() };\n')
-        out.write('    }\n')
-        out.write('    const image = join(base, item[1]);\n')
-        out.write('    const thumbnail = item.length >= 3 && item[2] ? join(thumbBase || base, item[2]) : join(thumbBase || base, item[1]);\n')
-        out.write('    return { type: "image", image, thumbnail, html, label: stem(item[1] || image) };\n')
-        out.write('  }).filter(Boolean);\n')
-        out.write('  return value.__pages;\n')
-        out.write('};\n')
-        out.write('window.galleryPagesMap = ')
-        json.dump(result, out, ensure_ascii=False, separators=(',', ':'))
-        out.write(';\n')
+        out.write(text)
+
+
+def render_gallery_pages_js(result):
+    lines = [
+        '/**',
+        ' * Auto-generated gallery pages map from site/structure.json.',
+        ' * Do not edit manually.',
+        ' */',
+        'window.resolveGalleryPageEntries = window.resolveGalleryPageEntries || function resolveGalleryPageEntries(value, fallbackHtml) {',
+        '  if (Array.isArray(value)) return value;',
+        '  if (!value || !Array.isArray(value.p)) return [];',
+        '  if (Array.isArray(value.__pages)) return value.__pages;',
+        '  const normalize = (path) => String(path || "").replace(/\\\\/g, "/").replace(/^\\/+/, "");',
+        '  const join = (base, path) => {',
+        '    const normalizedPath = normalize(path);',
+        '    if (!normalizedPath) return "";',
+        '    if (normalizedPath.startsWith("contents/") || normalizedPath.startsWith("thumbnail/")) return normalizedPath;',
+        '    const normalizedBase = normalize(base).replace(/\\/+$/, "");',
+        '    return normalizedBase ? normalizedBase + "/" + normalizedPath : normalizedPath;',
+        '  };',
+        '  const stem = (path) => {',
+        '    const normalizedPath = normalize(path);',
+        '    const fileName = normalizedPath.split("/").pop() || normalizedPath;',
+        '    return fileName.replace(/\\.[^.]+$/, "");',
+        '  };',
+        '  const ext = (path) => {',
+        '    const match = /\\.([^.]+)$/.exec(String(path || ""));',
+        '    return match ? match[1].toLowerCase() : "";',
+        '  };',
+        '  const base = value.b || "";',
+        '  const thumbBase = value.t || "";',
+        '  const html = join("", fallbackHtml || "");',
+        '  value.__pages = value.p.map((item) => {',
+        '    if (!Array.isArray(item) || item.length === 0) return null;',
+        '    if (item[0] === "v") {',
+        '      const video = join(base, item[1]);',
+        '      return { type: "video", video, html, thumbNumber: Number(item[2]) > 0 ? Number(item[2]) : null, label: item[3] || stem(item[1] || video), ext: String(item[4] || ext(item[1] || video)).toLowerCase() };',
+        '    }',
+        '    const image = join(base, item[1]);',
+        '    const thumbnail = item.length >= 3 && item[2] ? join(thumbBase || base, item[2]) : join(thumbBase || base, item[1]);',
+        '    return { type: "image", image, thumbnail, html, label: stem(item[1] || image) };',
+        '  }).filter(Boolean);',
+        '  return value.__pages;',
+        '};',
+        'window.galleryPagesMap = ' + json.dumps(result, ensure_ascii=False, separators=(',', ':')) + ';',
+        '',
+    ]
+    return '\n'.join(lines)
 
 
 def build_gallery_pages_map(structure: dict, diff: bool = False, generate_thumbnails: bool = False) -> tuple[dict, dict]:

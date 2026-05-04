@@ -20,6 +20,7 @@ site/structure.json
 tools/bin/*
 tools/sqlite/
 site/js/gallery-pages.js
+site/js/gallery-pages/
 site/js/structure.js
 
 # content_add workspaces (copies of tools/content_add/workspace/ for each server)

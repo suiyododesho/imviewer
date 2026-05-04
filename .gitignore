@@ -27,3 +27,4 @@ site/js/structure.js
 tools/content_add/*/
 !tools/content_add/workspace/
 tests/contents/*
+.artifacts/M06/logs/*

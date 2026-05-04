@@ -20,6 +20,7 @@ set "FULL_SCRIPT=%ROOT_DIR%\tools\build_gallery_pages_map.py"
 set "BUILD_BIN_SCRIPT=%ROOT_DIR%\tools\build_maintenance_bin.py"
 set "METADATA_SCRIPT=%ROOT_DIR%\tools\maint_metadata.py"
 set "SERIES_DIFF_SCRIPT=%ROOT_DIR%\tools\maint_series_diff.py"
+set "UC_CLI_SCRIPT=%ROOT_DIR%\tools\maint_uc_cli.py"
 set "METADATA_CSV=%ROOT_DIR%\tools\metadata.csv"
 set "DIFF_TARGETS_FILE=%ROOT_DIR%\.artifacts\M06\intermediate\t04-diff-targets.txt"
 
@@ -37,23 +38,17 @@ set "STATUS_LOG=%TEMP%\sitedesign_maintenance_last.log"
 
 echo.
 echo ========================================
-echo  structure.json maintenance tool
+echo  M06 UC1/UC2 maintenance tool
 echo ========================================
 echo 0: Help
-echo 1: Incremental build (sync + extract + thumbnails + covers + JS)
-echo 2: Full rebuild
-echo 3: Sync structure.json from contents
-echo 4: Extract archive contents
-echo 5: Generate gallery thumbnails
-echo 6: Refresh content covers in structure.json
-echo 7: Generate JS files (structure.js + gallery-pages.js + site-config.js)
-echo 8: Sync history.txt
-echo 9: Diff rebuild (gallery thumbnails + gallery-pages)
-echo 10: Build bin executables (cx_Freeze)
-echo 11: Export metadata to CSV (tools/metadata.csv)
-echo 12: Apply metadata from CSV to structure.json
-echo 13: T04 apply fingerprint and generate diff targets
-echo 14: Apply metadata from CSV with diff-targets filter
+echo 1: Plan - Contents import/sync + diff + site artifact generation (no write)
+echo 2: Plan - Metadata CSV reflect check (no write)
+echo 3: Validate - Contents import/sync + diff + site artifact generation
+echo 4: Validate - Metadata CSV reflect
+echo 5: Apply - Contents import/sync + diff + site artifact generation (approval required)
+echo 6: Apply - Metadata CSV reflect to structure.json (approval required)
+echo 7: Rollback DB from latest backup
+echo 8: Metadata CSV export (editing step)
 echo Other or empty input: Exit
 echo.
 
@@ -66,20 +61,14 @@ echo [DEBUG] MENU_NO="%MENU_NO%"
 echo.
 
 if "%MENU_NO%"=="0" goto :help
-if "%MENU_NO%"=="1" goto :incremental
-if "%MENU_NO%"=="2" goto :full
-if "%MENU_NO%"=="3" goto :structure_sync
-if "%MENU_NO%"=="4" goto :extract_archives
-if "%MENU_NO%"=="5" goto :gallery_thumbs
-if "%MENU_NO%"=="6" goto :refresh_covers
-if "%MENU_NO%"=="7" goto :generate_js
-if "%MENU_NO%"=="8" goto :history_sync
-if "%MENU_NO%"=="9" goto :diff_rebuild
-if "%MENU_NO%"=="10" goto :build_bin
-if "%MENU_NO%"=="11" goto :metadata_export
-if "%MENU_NO%"=="12" goto :metadata_apply
-if "%MENU_NO%"=="13" goto :t04_apply
-if "%MENU_NO%"=="14" goto :metadata_apply_diff_targets
+if "%MENU_NO%"=="1" goto :uc1_plan
+if "%MENU_NO%"=="2" goto :uc2_plan
+if "%MENU_NO%"=="3" goto :uc1_validate
+if "%MENU_NO%"=="4" goto :uc2_validate
+if "%MENU_NO%"=="5" goto :uc1_apply
+if "%MENU_NO%"=="6" goto :uc2_apply
+if "%MENU_NO%"=="7" goto :uc1_rollback
+if "%MENU_NO%"=="8" goto :metadata_export
 
 echo.
 echo No action selected. Exit.
@@ -88,20 +77,77 @@ goto :end
 :help
 echo.
 echo [Help]
-echo 1: Incremental build - sync structure.json, extract new archives, generate thumbnails, refresh covers, regenerate JS
-echo 2: Full rebuild - all steps including thumbnail generation and history sync
-echo 3: Sync structure.json from contents (add/remove series, rebuild content skeletons)
-echo 4: Extract PDF/CBZ/ZIP contents
-echo 5: Generate gallery thumbnails
-echo 6: Refresh content cover paths in structure.json
-echo 7: Generate JS files (structure.js + gallery-pages.js + site-config.js)
-echo 8: Sync history.txt
-echo 9: Diff rebuild for gallery thumbnails and gallery-pages.js
-echo 10: Build bin executables with cx_Freeze
-echo 11: Export entry metadata (main-person, labels, persons, series, note) to tools/metadata.csv
-echo 12: Apply metadata from tools/metadata.csv to structure.json
-echo 13: T04 apply fingerprints and write diff targets (history + file)
-echo 14: Apply metadata with --diff-targets-file (.artifacts/M06/intermediate/t04-diff-targets.txt)
+echo 1: Plan for content-side maintenance (import-plan + series-diff plan + site-artifacts plan)
+echo 2: Plan for metadata CSV reflection (metadata plan)
+echo 3: Validate content-side maintenance (pre-check + non-destructive validation steps)
+echo 4: Validate metadata CSV reflection (pre-check + non-destructive validation steps)
+echo 5: Apply content-side maintenance (requires approval prompt, then --approve)
+echo 6: Apply metadata CSV reflection (requires approval prompt, then --approve)
+echo 7: Rollback SQLite DB from latest backup
+echo 8: Metadata CSV export to tools/metadata.csv
+echo.
+echo NOTE: Legacy granular operations are deprecated in T07.
+echo       Use tools\maint_uc_cli.py directly for unified operations.
+goto :end
+
+:uc1_plan
+echo.
+echo [Plan: Contents import/sync + diff + site artifact generation]
+call :run_uc_cli plan uc1
+goto :end
+
+:uc2_plan
+echo.
+echo [Plan: Metadata CSV reflect check]
+call :run_uc_cli plan uc2
+goto :end
+
+:uc1_validate
+echo.
+echo [Validate: Contents import/sync + diff + site artifact generation]
+call :run_uc_cli validate uc1
+goto :end
+
+:uc2_validate
+echo.
+echo [Validate: Metadata CSV reflect]
+call :run_uc_cli validate uc2
+goto :end
+
+:uc1_apply
+echo.
+echo [Apply: Contents import/sync + diff + site artifact generation]
+set "APPLY_CONFIRM="
+set /p APPLY_CONFIRM=Type APPLY to execute write operations: 
+if /I not "%APPLY_CONFIRM%"=="APPLY" (
+  echo Canceled.
+  goto :end
+)
+call :run_uc_cli apply uc1 --approve
+goto :end
+
+:uc2_apply
+echo.
+echo [Apply: Metadata CSV reflect to structure.json]
+set "APPLY_CONFIRM="
+set /p APPLY_CONFIRM=Type APPLY to execute write operations: 
+if /I not "%APPLY_CONFIRM%"=="APPLY" (
+  echo Canceled.
+  goto :end
+)
+call :run_uc_cli apply uc2 --approve
+goto :end
+
+:uc1_rollback
+echo.
+echo [Rollback: Restore DB from latest backup]
+set "ROLLBACK_CONFIRM="
+set /p ROLLBACK_CONFIRM=Type ROLLBACK to restore DB from backup: 
+if /I not "%ROLLBACK_CONFIRM%"=="ROLLBACK" (
+  echo Canceled.
+  goto :end
+)
+call :run_uc_cli rollback
 goto :end
 
 :incremental
@@ -194,6 +240,28 @@ if "%RC%"=="0" (
   echo Error: export failed. exit code=%RC%
 )
 goto :end
+
+:run_uc_cli
+if not exist "%PYTHON_EXE%" (
+  echo Error: Python not found: %PYTHON_EXE%
+  goto :end
+)
+if not exist "%UC_CLI_SCRIPT%" (
+  echo Error: Script not found: %UC_CLI_SCRIPT%
+  goto :end
+)
+pushd "%ROOT_DIR%" >nul
+if /I "%~1"=="rollback" (
+  "%PYTHON_EXE%" "%UC_CLI_SCRIPT%" %* --db "%ROOT_DIR%\tools\sqlite\imviewer_maintenance.sqlite3"
+) else (
+  "%PYTHON_EXE%" "%UC_CLI_SCRIPT%" %* --db "%ROOT_DIR%\tools\sqlite\imviewer_maintenance.sqlite3" --structure "%ROOT_DIR%\site\structure.json" --site-dir "%ROOT_DIR%\site" --input-csv "%METADATA_CSV%" --diff-targets-file "%DIFF_TARGETS_FILE%"
+)
+set "RC=%ERRORLEVEL%"
+popd >nul
+if not "%RC%"=="0" (
+  echo Error: unified CLI failed. exit code=%RC%
+)
+exit /b %RC%
 
 :metadata_apply
 echo.

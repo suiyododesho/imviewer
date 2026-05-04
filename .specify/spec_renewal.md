@@ -24,3 +24,33 @@
 
 ## 変更点
 
+```diff
+### UC1/UC2 実行導線
+
+**before**
+
+- `tools/maintenance.bat` で多数の単機能メニューを選択し、UC1/UC2 を段階的に手動実行する。
+- 破壊的操作の前提チェックは運用者の手順依存で、同一導線での再開情報が残りにくい。
+
+**after**
+
+- `tools/maint_uc_cli.py` を統合CLIとして追加し、`plan` / `dry-run` / `apply` / `validate` / `rollback` を統一コマンドで提供する。
+- `apply` は `--approve` 指定時のみ実行する安全ガードを持つ。
+- `tools/maintenance.bat` は UC1/UC2 必須作業中心のメニューに整理し、統合CLIへ誘導する。
+
+```
+
+```diff
+### 中断復帰向けログ/状態管理
+
+**before**
+
+- 個別スクリプトの出力ログは分散し、実行単位の状態履歴を横断的に確認しづらい。
+
+**after**
+
+- 統合CLIは `.artifacts/M06/state/t07-uc-cli-state.jsonl` に実行状態（run_id, command, workflow, step結果, success）を追記する。
+- 各ステップの標準出力・標準エラーを `.artifacts/M06/logs/` に保存し、失敗時の再開判断を容易にする。
+
+```
+

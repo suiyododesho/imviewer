@@ -126,11 +126,11 @@
 
 ## T07: UC1/UC2 新CLI
 
-- [ ] T07-01 統合CLI作成（plan/apply/validate/rollback）
-- [ ] T07-02 既存メニューから段階移行できる導線実装
-- [ ] T07-03 中断復帰しやすいログ/状態管理を実装
-- [ ] T07-04 ここまでの開発で変更された仕様の記述 [記述先：spec_renewal.md](../spec_renewal.md)
-- [ ] T07-05 maintenance.bat のメニュー項目を棚卸しし、UC1/UC2 の必須作業のみを残す（非推奨項目は統合CLIへ誘導）
+- [x] T07-01 統合CLI作成（plan/apply/validate/rollback）
+- [x] T07-02 既存メニューから段階移行できる導線実装
+- [x] T07-03 中断復帰しやすいログ/状態管理を実装
+- [x] T07-04 ここまでの開発で変更された仕様の記述 [記述先：spec_renewal.md](../spec_renewal.md)
+- [x] T07-05 maintenance.bat のメニュー項目を棚卸しし、UC1/UC2 の必須作業のみを残す（非推奨項目は統合CLIへ誘導）
 
 受け入れ条件:
 - UC1/UC2 が少ないコマンドで完了する

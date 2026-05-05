@@ -28,3 +28,7 @@ tools/content_add/*/
 !tools/content_add/workspace/
 tests/contents/*
 .artifacts/M06/logs/*
+.artifacts/M06/metrics/*
+.artifacts/M06/state/*
+.artifacts/M06/intermediate/*
+.artifacts/M06/manifests/*

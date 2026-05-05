@@ -311,13 +311,16 @@ def _run_workflow(command: str, workflow: str, args: argparse.Namespace) -> int:
 
 def _run_validate(args: argparse.Namespace) -> int:
     errors: list[str] = []
-    required_paths = [Path(args.db), Path(args.structure), Path(args.site_dir)]
+    required_paths = [Path(args.structure), Path(args.site_dir)]
     for path in required_paths:
         if not path.exists():
             errors.append(f"missing: {path}")
 
     if args.workflow == "uc2" and not Path(args.input_csv).is_file():
         errors.append(f"missing metadata csv: {args.input_csv}")
+
+    if args.workflow == "uc1" and not Path(args.db).parent.exists():
+        errors.append(f"missing db directory: {Path(args.db).parent}")
 
     failed = _latest_failed_run(Path(args.state_file))
     resume_hint = ""

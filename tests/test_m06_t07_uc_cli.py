@@ -161,6 +161,43 @@ class M06T07UnifiedCliTests(unittest.TestCase):
             self.assertEqual(rc_validate, 0)
             self.assertTrue(state_file.is_file())
 
+    def test_validate_uc1_allows_missing_db_file(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            db_path = root / "sqlite" / "maintenance.sqlite3"
+            db_path.parent.mkdir(parents=True, exist_ok=True)
+
+            structure_path = root / "structure.json"
+            self._create_structure_json(structure_path)
+            site_dir = root / "site"
+            site_dir.mkdir(parents=True, exist_ok=True)
+
+            state_file = root / "state" / "state.jsonl"
+            log_dir = root / "logs"
+            metrics_log = root / "metrics.jsonl"
+
+            rc_validate = maint_uc_cli.main(
+                [
+                    "--state-file",
+                    str(state_file),
+                    "--log-dir",
+                    str(log_dir),
+                    "--metrics-log",
+                    str(metrics_log),
+                    "validate",
+                    "uc1",
+                    "--db",
+                    str(db_path),
+                    "--structure",
+                    str(structure_path),
+                    "--site-dir",
+                    str(site_dir),
+                ]
+            )
+
+            self.assertEqual(rc_validate, 0)
+            self.assertTrue(state_file.is_file())
+
     def test_apply_requires_approve_flag(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

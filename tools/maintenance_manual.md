@@ -15,6 +15,39 @@
   - ステップログ: .artifacts/M06/logs/
   - 計測ログ: .artifacts/M06/metrics/
 
+## 旧式メンテ手順からの初回移行（DB未作成の場合）
+
+### 重要
+
+- M06 の UC1/UC2 は SQLite（`tools/sqlite/imviewer_maintenance.sqlite3`）を正本として扱う
+- そのため、**初回のみ DB スキーマ作成が必須**
+- DB ファイルがない状態で `maintenance.bat` のメニュー **3/5**（UC1 validate/apply）を実行すると失敗する
+
+### 初回移行手順（推奨）
+
+1. `tools/init.bat` で DB スキーマ plan（非破壊）
+2. `tools/init.bat` で DB スキーマ apply（初回作成）
+3. `tools/maintenance.bat` で UC1 plan（メニュー **1**）
+4. `tools/maintenance.bat` で UC1 validate（メニュー **3**）
+5. `tools/maintenance.bat` で UC1 apply（メニュー **5**）
+
+### コマンド例（PowerShell）
+
+```powershell
+# 1) 初回だけ: init.bat で DB 初期化導線を実行
+cd tools
+.\init.bat
+
+# 2) 以降は maintenance.bat で通常運用
+.\maintenance.bat
+```
+
+### init.bat / maintenance.bat の役割分担
+
+- `init.bat`: DB スキーマ初期化専用（初回またはスキーマ更新時）
+- `maintenance.bat`: UC1/UC2 の日常運用（plan/validate/apply/rollback/export）
+- 初回移行時は `init.bat` 完了後に `maintenance.bat` へ進む
+
 ## ユースケース1: コンテンツ取り込み・差分反映・サイト生成
 
 ### こういう時に実施

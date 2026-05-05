@@ -3,6 +3,8 @@ import tempfile
 import unittest
 from pathlib import Path
 from unittest.mock import patch
+import io
+from contextlib import redirect_stdout
 
 from tools.history_manager import HistoryData
 from tools import build_gallery_pages_map
@@ -457,27 +459,69 @@ class MaintBuildStructureTests(unittest.TestCase):
         self.assertEqual(compact["p"][1], ["v", "clip.mp4", 1, "clip", "mp4"])
 
     def test_build_gallery_pages_map_main_runs_split_pipeline(self):
-        with (
-            patch.object(build_gallery_pages_map, "build_structure_main", return_value=0) as mock_structure,
-            patch.object(build_gallery_pages_map, "extract_archives_main", return_value=0) as mock_extract,
-            patch.object(build_gallery_pages_map, "build_gallery_thumbnails_main", return_value=0) as mock_thumbs,
-            patch.object(build_gallery_pages_map, "refresh_covers_main", return_value=0) as mock_covers,
-            patch.object(build_gallery_pages_map, "build_structure_js_main", return_value=0) as mock_structure_js,
-            patch.object(build_gallery_pages_map, "build_gallery_pages_main", return_value=0) as mock_gallery_pages,
-            patch.object(build_gallery_pages_map, "build_site_config_main", return_value=0) as mock_site_config,
-            patch.object(build_gallery_pages_map, "sync_history_main", return_value=0) as mock_history,
-        ):
-            rc = build_gallery_pages_map.main([])
+        with tempfile.TemporaryDirectory() as tmp:
+            metrics_path = Path(tmp) / "uc1-apply.jsonl"
+            with (
+                patch.object(build_gallery_pages_map, "build_structure_main", return_value=0) as mock_structure,
+                patch.object(build_gallery_pages_map, "extract_archives_main", return_value=0) as mock_extract,
+                patch.object(build_gallery_pages_map, "build_gallery_thumbnails_main", return_value=0) as mock_thumbs,
+                patch.object(build_gallery_pages_map, "refresh_covers_main", return_value=0) as mock_covers,
+                patch.object(build_gallery_pages_map, "build_structure_js_main", return_value=0) as mock_structure_js,
+                patch.object(build_gallery_pages_map, "build_gallery_pages_main", return_value=0) as mock_gallery_pages,
+                patch.object(build_gallery_pages_map, "build_site_config_main", return_value=0) as mock_site_config,
+                patch.object(build_gallery_pages_map, "sync_history_main", return_value=0) as mock_history,
+            ):
+                rc = build_gallery_pages_map.main(["--metrics-log", str(metrics_path)])
 
         self.assertEqual(rc, 0)
         mock_structure.assert_called_once_with(["--sync"])
-        mock_extract.assert_called_once_with()
-        mock_thumbs.assert_called_once_with()
-        mock_covers.assert_called_once_with()
-        mock_structure_js.assert_called_once_with()
-        mock_gallery_pages.assert_called_once_with()
-        mock_site_config.assert_called_once_with()
-        mock_history.assert_called_once_with()
+        mock_extract.assert_called_once_with([])
+        mock_thumbs.assert_called_once_with([])
+        mock_covers.assert_called_once_with([])
+        mock_structure_js.assert_called_once_with([])
+        mock_gallery_pages.assert_called_once_with([])
+        mock_site_config.assert_called_once_with([])
+        mock_history.assert_called_once_with([])
+
+    def test_build_gallery_pages_map_plan_mode_does_not_execute_steps(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            metrics_path = Path(tmp) / "uc1-plan.jsonl"
+            with (
+                patch.object(build_gallery_pages_map, "build_structure_main", return_value=0) as mock_structure,
+                patch.object(build_gallery_pages_map, "extract_archives_main", return_value=0) as mock_extract,
+                patch.object(build_gallery_pages_map, "build_gallery_thumbnails_main", return_value=0) as mock_thumbs,
+                patch.object(build_gallery_pages_map, "refresh_covers_main", return_value=0) as mock_covers,
+                patch.object(build_gallery_pages_map, "build_structure_js_main", return_value=0) as mock_structure_js,
+                patch.object(build_gallery_pages_map, "build_gallery_pages_main", return_value=0) as mock_gallery_pages,
+                patch.object(build_gallery_pages_map, "build_site_config_main", return_value=0) as mock_site_config,
+                patch.object(build_gallery_pages_map, "sync_history_main", return_value=0) as mock_history,
+            ):
+                rc = build_gallery_pages_map.main(["--plan", "--metrics-log", str(metrics_path)])
+
+        self.assertEqual(rc, 0)
+        mock_structure.assert_not_called()
+        mock_extract.assert_not_called()
+        mock_thumbs.assert_not_called()
+        mock_covers.assert_not_called()
+        mock_structure_js.assert_not_called()
+        mock_gallery_pages.assert_not_called()
+        mock_site_config.assert_not_called()
+        mock_history.assert_not_called()
+
+    def test_build_gallery_pages_map_writes_metrics_log(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            metrics_path = Path(tmp) / "uc1-metrics.jsonl"
+            stream = io.StringIO()
+            with redirect_stdout(stream):
+                rc = build_gallery_pages_map.main(["--plan", "--metrics-log", str(metrics_path)])
+
+            self.assertEqual(rc, 0)
+            self.assertTrue(metrics_path.is_file())
+            payload = json.loads(metrics_path.read_text(encoding="utf-8").strip().splitlines()[-1])
+            self.assertEqual(payload["pipeline"], "uc1-maintenance")
+            self.assertEqual(payload["mode"], "plan")
+            self.assertEqual(payload["success"], True)
+            self.assertEqual(payload["schema"], "imviewer.m06.metrics.v1")
 
     def test_main_add_missing_series_writes_scaffold_entries(self):
         structure = {

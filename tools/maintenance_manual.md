@@ -241,3 +241,129 @@ d:/Tool/_mytool/imviewer/.venv/Scripts/python.exe tools/maint_uc_cli.py validate
 | plan 再実行 (UC2) | 2 秒以内 |
 | NAS 再同期（差分のみ） | 転送量に依存、初回より大幅短縮 |
 
+---
+
+## M06 段階リリース手順（T10-01）
+
+### 概要
+
+M06（SQLite正本移行・統合CLI化）は、既存の `maintenance.bat` 単体運用を継続しながら段階的に切り替える。
+
+### フェーズ1: 並行運用（現在〜）
+
+- `tools/maintenance.bat` でのメニュー実行を継続する（旧導線は廃止しない）
+- SQLite DB が `tools/sqlite/imviewer_maintenance.sqlite3` に存在することを確認する
+- UC1/UC2 の新しいコマンドを個別に試験実行し、plan 結果が期待通りであることを確認する
+
+```powershell
+# 確認コマンド（非破壊）
+.venv\Scripts\python.exe tools/maint_uc_cli.py plan uc1
+.venv\Scripts\python.exe tools/maint_uc_cli.py plan uc2
+```
+
+### フェーズ2: 統合CLIへの移行（推奨移行手順）
+
+1. `maint_uc_cli.py validate uc1` または `validate uc2` で事前チェックを通す
+2. 初回 apply の前に DB バックアップが存在することを確認する
+   - バックアップ先: `tools/sqlite/backup/`
+3. `apply --approve` を実行し、結果を state ログで確認する
+4. 問題がなければ以降の UC1/UC2 作業は統合 CLI を使用する
+
+### フェーズ3: 旧導線の廃止
+
+- `maintenance.bat` の旧単機能メニューを参照する必要がなくなったタイミングで削除可能
+- `content_add.bat` は T08 の staging_ui.html に置き換えられており、新規使用は非推奨
+
+---
+
+## M06 切り戻し手順（T10-02）
+
+### 切り戻しが必要なケース
+
+- 統合 CLI apply 後にサイトの表示崩れや構造不整合が発生した
+- DB の整合性が取れなくなり、plan/validate が通らなくなった
+- M06 以前の `maintenance.bat` 単体運用に戻す必要が生じた
+
+### SQLite DB の切り戻し（部分切り戻し）
+
+DB だけ戻してファイル生成物はそのままにする場合:
+
+```powershell
+# 最新バックアップから DB を復元（バックアップは apply 前に自動生成）
+.venv\Scripts\python.exe tools/maint_uc_cli.py rollback
+
+# 特定バックアップから復元する場合
+.venv\Scripts\python.exe tools/maint_uc_cli.py rollback --backup tools/sqlite/backup/imviewer_maintenance_YYYYMMDD_HHMMSS.sqlite3.bak
+
+# 復元後に plan で差分を再確認
+.venv\Scripts\python.exe tools/maint_uc_cli.py plan uc1
+```
+
+### ブランチ切り戻し（完全切り戻し）
+
+M06 以前の `main` ブランチに完全に戻す必要がある場合:
+
+1. `main` ブランチの安定コミット: `b297fcc92a85a16814607e83b890ccf89b10fdbe`
+2. `site/structure.json` と `site/js/` は運用データなので、切り戻し後も上書きしない
+3. `tools/sqlite/` は M06 固有のため、旧運用では不要（削除可能）
+
+```powershell
+# git 経由の場合
+git checkout b297fcc92a85a16814607e83b890ccf89b10fdbe -- tools/ site/js/gallery-pages.js site/js/structure.js
+# 注意: site/structure.json, site/js/gallery-pages*.js, site/js/gallery-pages/ は上書きしない
+```
+
+### 切り戻し後の確認
+
+1. `maintenance.bat` でメニュー選択が動作することを確認する
+2. ブラウザで `site/index.html` を開き、ギャラリーが正常表示されることを確認する
+
+---
+
+## 新旧運用手順の比較（T11-01）
+
+### UC1: コンテンツ追加
+
+| ステップ | 旧運用 (maintenance.bat 単体) | 新運用 (統合CLI) |
+|---------|------------------------------|-----------------|
+| 差分確認 | maintenance.bat 各メニューを個別実行 | `maint_uc_cli.py plan uc1` |
+| 事前チェック | なし（手順書参照のみ） | `maint_uc_cli.py validate uc1` |
+| 実行 | maintenance.bat メニュー4〜6 を順番に選択 | `maint_uc_cli.py apply uc1 --approve` |
+| 実行ログ | 標準出力のみ（画面消えると残らない） | `.artifacts/M06/logs/` に自動保存 |
+| 失敗時の再開 | 手動で途中から再実行 | `state.jsonl` + logs で失敗ステップを特定し再実行 |
+| DB バックアップ | なし | apply 前に自動作成 |
+
+### UC2: メタデータ反映
+
+| ステップ | 旧運用 | 新運用 |
+|---------|--------|--------|
+| CSV エクスポート | maintenance.bat → メタデータ出力 | `maint_metadata.py export` または `maint_uc_cli.py plan uc2` |
+| 差分フィルタ | 全件更新のみ | `.artifacts/M06/intermediate/t04-diff-targets.txt` で絞り込み |
+| plan 確認 | なし | `maint_uc_cli.py plan uc2` |
+| 実行 | maintenance.bat → CSV 反映 | `maint_uc_cli.py apply uc2 --approve` |
+| gallery-pages 再生成 | 常に実行 | path 変更があった場合のみ実行（T01-01） |
+
+### コンテンツ追加の準備（配置方法）
+
+| 方法 | 旧運用 (content_add.bat) | 現在の推奨 |
+|------|--------------------------|-----------|
+| ファイル配置 | `tools/content_add/workspace/contents/` に手動配置 | `staging_ui.html` で D&D 配置 |
+| ツール | `content_add.bat` （廃止予定） | `tools/content_add/staging_ui.html` |
+| 備考 | 深い階層構造の手動配置が必要だった | GUI でジャンル/シリーズを選択してドロップ |
+
+---
+
+## トラブルシューティング索引（T11-01）
+
+| 症状 | 参照箇所 |
+|------|---------|
+| apply 途中でエラーになった | [障害復旧手順 §1](#障害復旧手順t09-03) → apply 途中失敗 |
+| NAS 同期中に接続が切れた | [障害復旧手順 §2](#障害復旧手順t09-03) → NAS 同期切断 |
+| CSV 反映で変更件数が 0 になる | [障害復旧手順 §3](#障害復旧手順t09-03) → CSV 不正入力 |
+| validate が errors を返す | [障害復旧手順 §4](#障害復旧手順t09-03) → validate エラー |
+| DB をバックアップ前の状態に戻したい | [切り戻し手順](#m06-切り戻し手順t10-02) → SQLite DB の切り戻し |
+| M06 以前の旧運用に完全に戻したい | [切り戻し手順](#m06-切り戻し手順t10-02) → ブランチ切り戻し |
+| state.jsonl の success が false になっている | `.artifacts/M06/state/t07-uc-cli-state.jsonl` を確認し、該当 run_id の logs ファイルを参照 |
+| plan の出力で「0 entries」と表示される | CSV の genre/entry_key 列、または DB と structure.json の整合を確認 |
+| gallery が正常表示されない | `site/js/structure.js` と `site/js/gallery-pages.js` が最新かどうか確認。`maint_uc_cli.py apply uc1 --approve` で再生成 |
+

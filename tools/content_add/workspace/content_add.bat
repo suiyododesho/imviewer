@@ -1,3 +1,9 @@
+@rem ============================================================
+@rem [DEPRECATED] content_add.bat is deprecated (M06/T08/T10-03)
+@rem Use staging_ui.html + maint_uc_cli.py instead.
+@rem  New: staging_ui.html -> maint_uc_cli.py apply uc1 --approve
+@rem  See: tools/maintenance_manual.md
+@rem ============================================================
 @echo off
 setlocal enabledelayedexpansion
 chcp 932 >nul

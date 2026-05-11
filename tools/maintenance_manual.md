@@ -67,6 +67,44 @@ cd tools
 2. Validate（事前チェック + 非破壊検証）　→ バッチ: メニュー **3**
 3. Apply（承認付きで反映）　→ バッチ: メニュー **5**
 
+### Plan（メニュー 1）で確認すること
+
+- 目的: 「今回どのシリーズ/件数が処理対象になるか」を事前に把握する
+- まず見る項目
+   - 差分件数（0件か、想定件数か）
+   - 対象シリーズ/エントリ一覧（意図しない作品が混ざっていないか）
+   - 処理予定ステップ（DB取り込み、差分反映、生成対象）
+- OK 判定
+   - 追加・更新したはずのコンテンツが対象に含まれている
+   - 触っていないはずのジャンル/シリーズが大量に含まれていない
+   - 件数感が「手元で変更した量」と大きくずれていない
+- NG 例と対処
+   - 0件: 配置先（`site/contents/`）と階層名、genre/series 名を再確認
+   - 想定外に多い: `site/history.txt` の `next.force_dirs` を確認し、不要エントリを除去して再 plan
+   - 想定外のシリーズ混入: 配置ミスや同名ディレクトリ重複を修正して再 plan
+
+### Validate（メニュー 3）で確認すること
+
+- 目的: apply 前に「実行可能な状態か」を壊さず検証する
+- まず見る項目
+   - `errors` の有無（1件でもあれば apply しない）
+   - `warnings` の内容（運用上許容するか判断）
+   - `resume_hint` の有無（前回失敗 run の継続情報がないか）
+- OK 判定
+   - `errors` が空
+   - `resume_hint` が不要、または内容を理解して対処済み
+   - warning があっても影響範囲を説明できる
+- NG 例と対処
+   - パス不存在エラー: 対象パス・設定を修正して再 validate
+   - 前回失敗の痕跡あり: 必要に応じて rollback（メニュー 7）後に plan → validate を再実行
+   - DB 未初期化: 初回移行手順に戻り `init.bat` でスキーマ apply を実施
+
+### 実運用の判断基準（最短版）
+
+- Plan で「対象が正しい」ことを確認
+- Validate で「errors がない」ことを確認
+- この2つを満たしたときだけ Apply（メニュー 5）に進む
+
 ### コマンド例（PowerShell）
 
 ```powershell
@@ -94,6 +132,44 @@ d:/Tool/_mytool/imviewer/.venv/Scripts/python.exe tools/maint_uc_cli.py apply uc
 2. Plan（非破壊）　→ バッチ: メニュー **2**
 3. Validate（事前チェック + 非破壊検証）　→ バッチ: メニュー **4**
 4. Apply（承認付きで反映）　→ バッチ: メニュー **6**
+
+### Plan（メニュー 2）で確認すること
+
+- 目的: 「CSV 変更のうち、どのエントリが反映対象か」を事前に把握する
+- まず見る項目
+   - 変更対象件数（0件か、想定件数か）
+   - 対象エントリ一覧（genre / entry_key が意図どおりか）
+   - 反映対象フィールド（name / labels / persons / note / path など）
+- OK 判定
+   - CSVで編集したエントリが対象に含まれている
+   - 対象件数が編集量と大きくずれていない
+   - 意図しないジャンル/エントリが大量に含まれていない
+- NG 例と対処
+   - 0件: CSV の `genre` / `entry_key` 列名・値、文字コード（UTF-8 BOM）を確認して再 plan
+   - 想定外に多い: CSV のフィルタ条件や `.artifacts/M06/intermediate/t04-diff-targets.txt` の内容を見直して再 plan
+   - path 変更が意図せず混入: CSV の `path` 列を見直し、不要変更を戻して再 plan
+
+### Validate（メニュー 4）で確認すること
+
+- 目的: apply 前に「CSV反映が安全に実行できる状態か」を壊さず検証する
+- まず見る項目
+   - `errors` の有無（1件でもあれば apply しない）
+   - `warnings` の内容（列欠損、genre 不一致、値フォーマット不正など）
+   - `resume_hint` の有無（前回失敗 run の継続情報がないか）
+- OK 判定
+   - `errors` が空
+   - warning があっても影響範囲を説明できる
+   - `resume_hint` が不要、または内容を理解して対処済み
+- NG 例と対処
+   - 列名/必須値エラー: CSV ヘッダ・必須列を修正して再 validate
+   - genre not found: `site/structure.json` の genres キーと CSV の `genre` を一致させて再 validate
+   - 前回失敗の痕跡あり: 必要に応じて rollback（メニュー 7）後に plan → validate を再実行
+
+### 実運用の判断基準（UC2 最短版）
+
+- Plan で「対象エントリと件数が正しい」ことを確認
+- Validate で「errors がない」ことを確認
+- この2つを満たしたときだけ Apply（メニュー 6）に進む
 
 ### コマンド例（PowerShell）
 

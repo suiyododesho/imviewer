@@ -41,18 +41,21 @@ echo ========================================
 echo  M06 UC1/UC2 maintenance tool
 echo ========================================
 echo 0: Help
+echo --- contents maintenance(full) ---
+echo 11: Full publish pipeline (contents->json->extract/thumbs->DB->site artifacts)
 echo --- contents maintenance ---
 echo 1: Sync structure.json from site/contents (add/update first)
-echo 2: Plan - Contents import/sync + diff + site artifact generation (no write)
-echo 3: Validate - Contents import/sync + diff + site artifact generation
-echo 4: Apply - Contents import/sync + diff + site artifact generation (approval required)
+echo 2: Plan - DB import/sync + diff + site artifact generation (no write)
+echo 3: Validate - DB import/sync + diff + site artifact generation
+echo 4: Run extract/thumbs (extract archives + structure sync + thumbnails)
+echo 5: Apply - DB import/sync + diff + site artifact generation (approval required)
 echo --- metadata maintenance ---
-echo 5: Metadata CSV export (editing step)
-echo 6: Plan - Metadata CSV reflect check (no write)
-echo 7: Validate - Metadata CSV reflect
-echo 8: Apply - Metadata CSV reflect to structure.json (approval required)
+echo 6: Metadata CSV export (editing step)
+echo 7: Plan - Metadata CSV reflect check (no write)
+echo 8: Validate - Metadata CSV reflect
+echo 9: Apply - Metadata CSV reflect to structure.json (approval required)
 echo --- other operations ---
-echo 9: Rollback DB from latest backup
+echo 10: Rollback DB from latest backup
 echo Other or empty input: Exit
 echo.
 
@@ -68,12 +71,14 @@ if "%MENU_NO%"=="0" goto :help
 if "%MENU_NO%"=="1" goto :structure_sync_menu
 if "%MENU_NO%"=="2" goto :uc1_plan
 if "%MENU_NO%"=="3" goto :uc1_validate
-if "%MENU_NO%"=="4" goto :uc1_apply
-if "%MENU_NO%"=="5" goto :metadata_export
-if "%MENU_NO%"=="6" goto :uc2_plan
-if "%MENU_NO%"=="7" goto :uc2_validate
-if "%MENU_NO%"=="8" goto :uc2_apply
-if "%MENU_NO%"=="9" goto :uc1_rollback
+if "%MENU_NO%"=="4" goto :uc1_extract_thumbs
+if "%MENU_NO%"=="5" goto :uc1_apply
+if "%MENU_NO%"=="6" goto :metadata_export
+if "%MENU_NO%"=="7" goto :uc2_plan
+if "%MENU_NO%"=="8" goto :uc2_validate
+if "%MENU_NO%"=="9" goto :uc2_apply
+if "%MENU_NO%"=="10" goto :uc1_rollback
+if "%MENU_NO%"=="11" goto :full_publish_apply
 
 echo.
 echo No action selected. Exit.
@@ -83,17 +88,19 @@ goto :end
 echo.
 echo [Help]
 echo ---
-echo 1: Sync structure.json from site/contents (recommended before UC1 2/3/4 when new content was added)
-echo 2: Plan for content-side maintenance (import-plan + series-diff plan + site-artifacts plan)
-echo 3: Validate content-side maintenance (pre-check + non-destructive validation steps)
-echo 4: Apply content-side maintenance (requires approval prompt, then --approve)
+echo 1: Sync structure.json from site/contents (recommended before UC1 2/3/4/5 when new content was added)
+echo 2: Plan for UC1 DB/site maintenance (import-plan + series-diff plan + site-artifacts plan)
+echo 3: Validate UC1 DB/site maintenance (pre-check + non-destructive validation steps)
+echo 4: Run extract/thumbs (extract archives + structure sync + thumbnail generation)
+echo 5: Apply UC1 DB/site maintenance (requires approval prompt, then --approve)
 echo ---
-echo 5: Metadata CSV export to tools/metadata.csv
-echo 6: Plan for metadata CSV reflection (metadata plan)
-echo 7: Validate metadata CSV reflection (pre-check + non-destructive validation steps)
-echo 8: Apply metadata CSV reflection (requires approval prompt, then --approve)
+echo 6: Metadata CSV export to tools/metadata.csv
+echo 7: Plan for metadata CSV reflection (metadata plan)
+echo 8: Validate metadata CSV reflection (pre-check + non-destructive validation steps)
+echo 9: Apply metadata CSV reflection (requires approval prompt, then --approve)
 echo ---
-echo 9: Rollback SQLite DB from latest backup
+echo 10: Rollback SQLite DB from latest backup
+echo 11: Full publish pipeline apply (structure sync -> extract archives -> structure sync -> thumbnails -> covers -> UC1 apply)
 echo.
 echo NOTE: Legacy granular operations are deprecated in T07.
 echo       Use tools\maint_uc_cli.py directly for unified operations.
@@ -108,7 +115,7 @@ goto :end
 
 :uc1_plan
 echo.
-echo [Plan: Contents import/sync + diff + site artifact generation]
+echo [Plan: DB import/sync + diff + site artifact generation]
 call :run_uc_cli plan uc1
 goto :end
 
@@ -120,8 +127,18 @@ goto :end
 
 :uc1_validate
 echo.
-echo [Validate: Contents import/sync + diff + site artifact generation]
+echo [Validate: DB import/sync + diff + site artifact generation]
 call :run_uc_cli validate uc1
+goto :end
+
+:uc1_extract_thumbs
+echo.
+echo [Run extract/thumbs: extract archives + structure sync + thumbnails]
+call :run_extract_archives
+if errorlevel 1 goto :end
+call :run_structure_sync --no-remove-missing
+if errorlevel 1 goto :end
+call :run_gallery_thumbnails
 goto :end
 
 :uc2_validate
@@ -132,13 +149,42 @@ goto :end
 
 :uc1_apply
 echo.
-echo [Apply: Contents import/sync + diff + site artifact generation]
+echo [Apply: DB import/sync + diff + site artifact generation]
 set "APPLY_CONFIRM="
 set /p APPLY_CONFIRM=Type APPLY to execute write operations: 
 if /I not "%APPLY_CONFIRM%"=="APPLY" (
   echo Canceled.
   goto :end
 )
+call :run_uc_cli apply uc1 --approve
+goto :end
+
+:full_publish_apply
+echo.
+echo [Full publish pipeline: contents -> json -> extract/thumbs -> DB -> site artifacts]
+echo Steps:
+echo   1) structure sync (--no-remove-missing)
+echo   2) extract archives
+echo   3) structure sync (--no-remove-missing, reflect extracted files)
+echo   4) generate gallery thumbnails
+echo   5) refresh covers
+echo   6) UC1 apply (DB import/sync + diff + site artifacts)
+set "PUBLISH_CONFIRM="
+set /p PUBLISH_CONFIRM=Type PUBLISH to execute full publish pipeline: 
+if /I not "%PUBLISH_CONFIRM%"=="PUBLISH" (
+  echo Canceled.
+  goto :end
+)
+call :run_structure_sync --no-remove-missing
+if errorlevel 1 goto :end
+call :run_extract_archives
+if errorlevel 1 goto :end
+call :run_structure_sync --no-remove-missing
+if errorlevel 1 goto :end
+call :run_gallery_thumbnails
+if errorlevel 1 goto :end
+call :run_refresh_covers
+if errorlevel 1 goto :end
 call :run_uc_cli apply uc1 --approve
 goto :end
 

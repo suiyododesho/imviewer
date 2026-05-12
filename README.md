@@ -60,6 +60,19 @@ Reusable CLI tool:
 - `GITHUB_TOKEN` は GitHub が自動生成する一時的なトークンであり、ワークフロー終了後に失効する
 - Secrets に追加のトークンは不要
 
+## M06 メンテナンス（structure.json 同期）
+
+`site/contents` 配下に新しいフォルダやファイルを追加した場合は、UC1 の validate/apply を実行する前に structure 同期を行ってください。
+
+- `tools\\maintenance.bat` のメニュー `1`（`Sync structure.json from site/contents (add/update first)`）を実行します。
+- この同期は `--no-remove-missing` で実行されるため、現在のローカル環境に存在しない項目を誤って削除しないようになっています。
+
+新規コンテンツ登録時の推奨手順:
+
+1. メニュー `1` で `site/structure.json` を `site/contents` から同期する。
+2. メニュー `3`（`Validate - Contents import/sync + diff + site artifact generation`）を実行する。
+3. メニュー `4`（`Apply - Contents import/sync + diff + site artifact generation`）を実行する。
+
 ---
 
 ## Usage

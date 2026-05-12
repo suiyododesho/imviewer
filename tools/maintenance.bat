@@ -41,14 +41,18 @@ echo ========================================
 echo  M06 UC1/UC2 maintenance tool
 echo ========================================
 echo 0: Help
-echo 1: Plan - Contents import/sync + diff + site artifact generation (no write)
-echo 2: Plan - Metadata CSV reflect check (no write)
+echo --- contents maintenance ---
+echo 1: Sync structure.json from site/contents (add/update first)
+echo 2: Plan - Contents import/sync + diff + site artifact generation (no write)
 echo 3: Validate - Contents import/sync + diff + site artifact generation
-echo 4: Validate - Metadata CSV reflect
-echo 5: Apply - Contents import/sync + diff + site artifact generation (approval required)
-echo 6: Apply - Metadata CSV reflect to structure.json (approval required)
-echo 7: Rollback DB from latest backup
-echo 8: Metadata CSV export (editing step)
+echo 4: Apply - Contents import/sync + diff + site artifact generation (approval required)
+echo --- metadata maintenance ---
+echo 5: Metadata CSV export (editing step)
+echo 6: Plan - Metadata CSV reflect check (no write)
+echo 7: Validate - Metadata CSV reflect
+echo 8: Apply - Metadata CSV reflect to structure.json (approval required)
+echo --- other operations ---
+echo 9: Rollback DB from latest backup
 echo Other or empty input: Exit
 echo.
 
@@ -61,14 +65,15 @@ echo [DEBUG] MENU_NO="%MENU_NO%"
 echo.
 
 if "%MENU_NO%"=="0" goto :help
-if "%MENU_NO%"=="1" goto :uc1_plan
-if "%MENU_NO%"=="2" goto :uc2_plan
+if "%MENU_NO%"=="1" goto :structure_sync_menu
+if "%MENU_NO%"=="2" goto :uc1_plan
 if "%MENU_NO%"=="3" goto :uc1_validate
-if "%MENU_NO%"=="4" goto :uc2_validate
-if "%MENU_NO%"=="5" goto :uc1_apply
-if "%MENU_NO%"=="6" goto :uc2_apply
-if "%MENU_NO%"=="7" goto :uc1_rollback
-if "%MENU_NO%"=="8" goto :metadata_export
+if "%MENU_NO%"=="4" goto :uc1_apply
+if "%MENU_NO%"=="5" goto :metadata_export
+if "%MENU_NO%"=="6" goto :uc2_plan
+if "%MENU_NO%"=="7" goto :uc2_validate
+if "%MENU_NO%"=="8" goto :uc2_apply
+if "%MENU_NO%"=="9" goto :uc1_rollback
 
 echo.
 echo No action selected. Exit.
@@ -77,17 +82,28 @@ goto :end
 :help
 echo.
 echo [Help]
-echo 1: Plan for content-side maintenance (import-plan + series-diff plan + site-artifacts plan)
-echo 2: Plan for metadata CSV reflection (metadata plan)
+echo ---
+echo 1: Sync structure.json from site/contents (recommended before UC1 2/3/4 when new content was added)
+echo 2: Plan for content-side maintenance (import-plan + series-diff plan + site-artifacts plan)
 echo 3: Validate content-side maintenance (pre-check + non-destructive validation steps)
-echo 4: Validate metadata CSV reflection (pre-check + non-destructive validation steps)
-echo 5: Apply content-side maintenance (requires approval prompt, then --approve)
-echo 6: Apply metadata CSV reflection (requires approval prompt, then --approve)
-echo 7: Rollback SQLite DB from latest backup
-echo 8: Metadata CSV export to tools/metadata.csv
+echo 4: Apply content-side maintenance (requires approval prompt, then --approve)
+echo ---
+echo 5: Metadata CSV export to tools/metadata.csv
+echo 6: Plan for metadata CSV reflection (metadata plan)
+echo 7: Validate metadata CSV reflection (pre-check + non-destructive validation steps)
+echo 8: Apply metadata CSV reflection (requires approval prompt, then --approve)
+echo ---
+echo 9: Rollback SQLite DB from latest backup
 echo.
 echo NOTE: Legacy granular operations are deprecated in T07.
 echo       Use tools\maint_uc_cli.py directly for unified operations.
+goto :end
+
+:structure_sync_menu
+echo.
+echo [Sync: structure.json from site/contents (add/update)]
+echo NOTE: This sync uses --no-remove-missing to avoid deleting entries not present in current local contents.
+call :run_structure_sync --no-remove-missing
 goto :end
 
 :uc1_plan

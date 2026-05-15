@@ -42,7 +42,7 @@ echo  M06 UC1/UC2 maintenance tool
 echo ========================================
 echo 0: Help
 echo --- contents maintenance(full) ---
-echo 11: Full publish pipeline (contents->json->extract/thumbs->DB->site artifacts)
+echo 11: Full publish pipeline (contents - json - extract/thumbs - DB - site artifacts)
 echo --- contents maintenance ---
 echo 1: Sync structure.json from site/contents (add/update first)
 echo 2: Plan - DB import/sync + diff + site artifact generation (no write)
@@ -100,7 +100,7 @@ echo 8: Validate metadata CSV reflection (pre-check + non-destructive validation
 echo 9: Apply metadata CSV reflection (requires approval prompt, then --approve)
 echo ---
 echo 10: Rollback SQLite DB from latest backup
-echo 11: Full publish pipeline apply (structure sync -> extract archives -> structure sync -> thumbnails -> covers -> UC1 apply)
+echo 11: Full publish pipeline apply (contents - json - extract/thumbs - DB - site artifacts)
 echo.
 echo NOTE: Legacy granular operations are deprecated in T07.
 echo       Use tools\maint_uc_cli.py directly for unified operations.
@@ -161,7 +161,7 @@ goto :end
 
 :full_publish_apply
 echo.
-echo [Full publish pipeline: contents -> json -> extract/thumbs -> DB -> site artifacts]
+echo [Full publish pipeline: contents to json to extract/thumbs to DB to site artifacts]
 echo Steps:
 echo   1) structure sync (--no-remove-missing)
 echo   2) extract archives
@@ -171,7 +171,16 @@ echo   5) refresh covers
 echo   6) UC1 apply (DB import/sync + diff + site artifacts)
 set "PUBLISH_CONFIRM="
 set /p PUBLISH_CONFIRM=Type PUBLISH to execute full publish pipeline: 
-if /I not "%PUBLISH_CONFIRM%"=="PUBLISH" (
+set "PUBLISH_CONFIRM=%PUBLISH_CONFIRM:\"=%"
+set "PUBLISH_CONFIRM_NOSPACE=%PUBLISH_CONFIRM: =%"
+if /I "%PUBLISH_CONFIRM_NOSPACE%"=="PUBLISH" goto :full_publish_apply_run
+if /I "%PUBLISH_CONFIRM_NOSPACE%"=="APPLY" goto :full_publish_apply_run
+
+echo Canceled. Type PUBLISH or APPLY to execute full publish pipeline.
+goto :end
+
+:full_publish_apply_run
+if "%PUBLISH_CONFIRM%"=="" (
   echo Canceled.
   goto :end
 )
@@ -181,7 +190,7 @@ call :run_extract_archives
 if errorlevel 1 goto :end
 call :run_structure_sync --no-remove-missing
 if errorlevel 1 goto :end
-call :run_gallery_thumbnails
+call :run_gallery_thumbnails_full
 if errorlevel 1 goto :end
 call :run_refresh_covers
 if errorlevel 1 goto :end
@@ -454,6 +463,10 @@ exit /b %ERRORLEVEL%
 
 :run_gallery_thumbnails_diff
 call :run_python_or_exe "%THUMB_SCRIPT%" "%THUMB_EXE%" "maint_build_gallery_thumbnails.py --diff running..." --diff
+exit /b %ERRORLEVEL%
+
+:run_gallery_thumbnails_full
+call :run_python_or_exe "%THUMB_SCRIPT%" "%THUMB_EXE%" "maint_build_gallery_thumbnails.py --full running..." --full
 exit /b %ERRORLEVEL%
 
 :run_refresh_covers
